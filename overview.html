@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Overview',async m=>{
+ const{t,a,p,i,h,b,g}=await load(),yr=today().slice(0,4),mo=today().slice(0,7),yt=t.filter(x=>x.date.startsWith(yr));
+ const cash=bal(a,t).reduce((s,x)=>s+x.bal,0),rec=owed(i,'sale'),pay=owed(i,'purchase'),as=h.reduce((s,x)=>s+ +x.value,0);
+ const card=(k,v,c='')=>`<div class=card><div class=k>${k}</div><div class="v ${c}">${v}</div></div>`;
+ const top=p.filter(x=>x.kind==='client').map(x=>[x.name,i.filter(y=>y.party_id===x.id&&y.kind==='sale').reduce((s,y)=>s+y.amount-y.paid,0)]).filter(x=>x[1]>0).sort((u,v)=>v[1]-u[1]).slice(0,5);
+ m.innerHTML=`<div class="row c4">${card('Net worth',inr(cash+as+rec-pay))}${card('Income, '+yr,inr(sum(yt,'income')),'up')}${card('Expenses, '+yr,inr(sum(yt,'expense')),'dn')}${card('Profit, '+yr,inr(sum(yt,'income')-sum(yt,'expense')))}</div>
+ <div class="row c4"><div class=card><h3>Top outstanding clients</h3><table class=sm>${top.map(x=>`<tr><td>${esc(x[0])}<td class=r>${inr(x[1])}</tr>`).join('')||'<tr><td>Nothing outstanding.</tr>'}</table></div>
+ <div class=card><h3>Budgets this month</h3><table class=sm>${b.map(x=>{const s=spent(t,x.category,mo);return`<tr><td>${esc(x.category)}<td class="r ${s>x.monthly_limit?'dn':''}">${inr(s)} / ${inr(x.monthly_limit)}</tr>`}).join('')||'<tr><td>No budgets set.</tr>'}</table></div>
+ <div class=card><h3>Goals</h3><table class=sm>${g.map(x=>`<tr><td>${esc(x.name)}<td class=r>${Math.round(x.saved/x.target*100)}%</tr>`).join('')||'<tr><td>No goals set.</tr>'}</table></div>
+ <div class=card><h3>Open items</h3><table class=sm><tr><td>Overdue invoices<td class=r>${i.filter(x=>x.amount-x.paid>0&&x.due_date&&days(x.due_date)<0).length}</tr><tr><td>Receivables<td class=r>${inr(rec)}</tr><tr><td>Payables<td class=r>${inr(pay)}</tr><tr><td>Assets & investments<td class=r>${inr(as)}</tr></table></div></div>`;
+});
+</script></body></html>

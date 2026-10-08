@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Reminders',async m=>{
+ const{r,i}=await load(),inv=i.filter(x=>x.amount-x.paid>0&&x.due_date).sort((p,q)=>p.due_date<q.due_date?-1:1);
+ m.innerHTML=`<div class=card><h3>Add reminder</h3><form class=f id=f><input name=title placeholder="e.g. GST return filing" required><input type=date name=due_date required><button>Save reminder</button></form></div>
+ <div class=card><h3>Your reminders</h3><table>${r.slice().sort((p,q)=>p.due_date<q.due_date?-1:1).map(x=>`<tr><td>${x.done?'<s>'+esc(x.title)+'</s>':esc(x.title)}<td>${x.due_date}<td>${x.done?'Done':due(x.due_date)}<td class=r><button class=g data-t="${x.id}">${x.done?'Reopen':'Mark done'}</button> <button class=x data-d="${x.id}">Delete</button></tr>`).join('')||'<tr><td>No reminders yet.</tr>'}</table></div>
+ <div class=card><h3>Invoice due dates (automatic)</h3><table>${inv.map(x=>`<tr><td>${x.kind==='sale'?'Collect':'Pay'} invoice ${esc(x.number)}<td>${x.due_date}<td>${due(x.due_date)}<td class=r>${inr(x.amount-x.paid)}</tr>`).join('')||'<tr><td>No open invoices with due dates.</tr>'}</table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();if(await ok(db.from('reminders').insert(Object.fromEntries(new FormData($('#f'))))))$('#f').reset()};
+ m.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>ok(db.from('reminders').update({done:!r.find(x=>x.id===b.dataset.t).done}).eq('id',b.dataset.t)));
+ m.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>ok(db.from('reminders').delete().eq('id',b.dataset.d)));
+});
+</script></body></html>

@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Banking & Accounts',async m=>{
+ const{a,t}=await load(),b=bal(a,t);
+ m.innerHTML=`<div class=card><h3>Add account</h3><form class=f id=f><input name=name placeholder="Account name (e.g. HDFC Bank)" required><input name=opening type=number step=0.01 placeholder="Opening balance (₹)" value=0><button>Save account</button></form></div>
+ <div class=card><table><tr><th>Account<th class=r>Opening<th class=r>Inflows<th class=r>Outflows<th class=r>Balance<th></tr>${b.map(x=>`<tr><td>${esc(x.name)}<td class=r>${inr(x.opening)}<td class="r up">${inr(x.inc)}<td class="r dn">${inr(x.exp)}<td class=r><b>${inr(x.bal)}</b><td><button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=6>No accounts yet.</tr>'}<tr><td colspan=4><b>Total</b><td class=r><b>${inr(b.reduce((s,x)=>s+x.bal,0))}</b><td></tr></table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(await ok(db.from('accounts').insert({name:d.name,opening:+d.opening||0})))$('#f').reset()};
+ m.querySelectorAll('.x').forEach(x=>x.onclick=()=>confirm('Delete this account? Its transactions stay but become unassigned.')&&ok(db.from('accounts').delete().eq('id',x.dataset.id)));
+});
+</script></body></html>

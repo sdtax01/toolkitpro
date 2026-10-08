@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+let mo=today().slice(0,7);
+boot('Taxes',async function render(m){
+ const{i,r,t}=await load(),nx=d=>{const x=new Date(mo+'-01T00:00:00Z');x.setUTCMonth(x.getUTCMonth()+1);return x.toISOString().slice(0,7)+'-'+d};
+ const T=k=>{const l=i.filter(x=>x.kind===k&&x.date.startsWith(mo));return{l,tv:l.reduce((s,x)=>s+(+x.taxable||+x.amount),0),c:l.reduce((s,x)=>s+(+x.cgst||0),0),s:l.reduce((s,x)=>s+(+x.sgst||0),0),g:l.reduce((s,x)=>s+(+x.igst||0),0)}};
+ const o=T('sale'),n=T('purchase'),ot=o.c+o.s+o.g,it=n.c+n.s+n.g,paid=t.filter(x=>x.type==='expense'&&x.date.startsWith(mo)&&(x.category||'').toLowerCase()==='taxes').reduce((s,x)=>s+ +x.amount,0);
+ const y=+mo.slice(0,4),fy=+mo.slice(5)>=4?y:y-1;
+ m.innerHTML=`<div><input type=month id=mo value="${mo}"></div>
+ <div class="row c4"><div class=card><div class=k>Output GST (sales)</div><div class=v>${inr(ot)}</div></div><div class=card><div class=k>Input GST (purchases)</div><div class=v>${inr(it)}</div></div><div class=card><div class=k>Net GST ${ot>=it?'payable':'refundable'}</div><div class="v ${ot>=it?'dn':'up'}">${inr(Math.abs(ot-it))}</div></div><div class=card><div class=k>Tax paid (category "Taxes")</div><div class=v>${inr(paid)}</div></div></div>
+ <div class=card><h3>GST breakup, ${mo}</h3><table><tr><th><th class=r>Taxable<th class=r>CGST<th class=r>SGST<th class=r>IGST</tr><tr><td>Sales<td class=r>${inr(o.tv)}<td class=r>${inr(o.c)}<td class=r>${inr(o.s)}<td class=r>${inr(o.g)}</tr><tr><td>Purchases<td class=r>${inr(n.tv)}<td class=r>${inr(n.c)}<td class=r>${inr(n.s)}<td class=r>${inr(n.g)}</tr></table><p class=k>Simple netting of output and input GST. Check eligibility of input credit before filing.</p>${i.some(x=>x.taxable==null)?'<p class=dn>Some invoices have no GST breakup, so their full amount is shown as taxable. Use Set GST on the Clients or Suppliers page.</p>':''}</div>
+ <div class=card><h3>Due dates</h3><button id=gr>Add GSTR-1 and GSTR-3B reminders for ${mo}</button> <button class=g id=at>Add advance tax dates for FY ${fy}-${String(fy+1).slice(2)}</button></div>`;
+ $('#mo').onchange=e=>{mo=e.target.value||mo;render(m)};
+ const addR=async l=>{const have=new Set(r.map(x=>x.title+x.due_date)),nw=l.filter(x=>!have.has(x.title+x.due_date));if(!nw.length)return toast('Already added');if(await ok(db.from('reminders').insert(nw)))toast('Reminders added')};
+ $('#gr').onclick=()=>addR([{title:'GSTR-1 for '+mo,due_date:nx('11')},{title:'GSTR-3B for '+mo,due_date:nx('20')}]);
+ $('#at').onclick=()=>addR([[`${fy}-06-15`,15],[`${fy}-09-15`,45],[`${fy}-12-15`,75],[`${fy+1}-03-15`,100]].map(([d,p])=>({title:`Advance tax: ${p}% cumulative`,due_date:d})));
+});
+</script></body></html>

@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Budgets',async m=>{
+ const{t,b}=await load(),mo=today().slice(0,7);
+ m.innerHTML=`<div class=card><h3>Add monthly budget</h3><form class=f id=f><input name=category placeholder="Expense category (as used in transactions)" required><input name=monthly_limit type=number min=1 placeholder="Monthly limit (₹)" required><button>Save budget</button></form></div>
+ <div class=card><h3>This month (${mo})</h3><table><tr><th>Category<th class=r>Limit<th class=r>Spent<th>Used<th></tr>${b.map(x=>{const s=spent(t,x.category,mo);return`<tr><td>${esc(x.category)}<td class=r>${inr(x.monthly_limit)}<td class="r ${s>x.monthly_limit?'dn':''}">${inr(s)}<td>${bar(s,x.monthly_limit)}<small class=k>${Math.round(s/x.monthly_limit*100)}%</small><td><button class=x data-id="${x.id}">Delete</button></tr>`}).join('')||'<tr><td colspan=5>No budgets yet. Spending is matched by expense category.</tr>'}</table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(await ok(db.from('budgets').insert({category:d.category,monthly_limit:+d.monthly_limit})))$('#f').reset()};
+ m.querySelectorAll('.x').forEach(x=>x.onclick=()=>confirm('Delete this budget?')&&ok(db.from('budgets').delete().eq('id',x.dataset.id)));
+});
+</script></body></html>

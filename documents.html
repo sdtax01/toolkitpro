@@ -1,0 +1,12 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Documents',async m=>{
+ const{d}=await load();
+ m.innerHTML=`<div class=card><h3>Upload document</h3><form class=f id=f><input type=file id=file required><select id=cat><option>GST<option>ITR<option>TDS<option>Invoices<option>Bank<option>Other</select><button>Upload</button></form></div>
+ <div class=card><table><tr><th>Name<th>Category<th class=r>Size<th></tr>${d.map(x=>`<tr><td>${esc(x.name)}<td>${esc(x.category)}<td class=r>${Math.max(1,Math.round(x.size/1024))} KB<td><button class=g data-dl="${x.id}">Download</button> <button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=4>No documents yet.</tr>'}</table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const f=$('#file').files[0];if(!f)return;const{data:{user}}=await db.auth.getUser(),path=`${user.id}/${Date.now()}-${f.name.replace(/[^\w.\-]/g,'_')}`;
+  const up=await db.storage.from('documents').upload(path,f);if(up.error)return alert(up.error.message);
+  if(await ok(db.from('documents').insert({name:f.name,category:$('#cat').value,path,size:f.size})))toast('Uploaded')};
+ m.querySelectorAll('[data-dl]').forEach(b=>b.onclick=async()=>{const x=d.find(y=>y.id===b.dataset.dl),{data,error}=await db.storage.from('documents').createSignedUrl(x.path,60);error?alert(error.message):window.open(data.signedUrl)});
+ m.querySelectorAll('.x').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this document?'))return;const x=d.find(y=>y.id===b.dataset.id);await db.storage.from('documents').remove([x.path]);await ok(db.from('documents').delete().eq('id',x.id))});
+});
+</script></body></html>

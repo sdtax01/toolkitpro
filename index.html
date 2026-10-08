@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script><script src="assets/app.js"></script></head><body><script>
+let mo=today().slice(0,7),ch={};
+const draw=(id,cfg)=>{ch[id]?.destroy();ch[id]=new Chart(document.getElementById(id),cfg)};
+const pct=(a,b)=>b?((a-b)/b*100).toFixed(1)+'% vs last month':'—';
+const COL=['#2f5ee8','#16a34a','#f59e0b','#7c4dff','#ef4444','#0d9488','#8a8f3c'];
+async function render(m){
+ const{t,a,i,r,h}=await load();
+ const pm=new Date(mo+'-01');pm.setMonth(pm.getMonth()-1);const pk=pm.toISOString().slice(0,7);
+ const cm=t.filter(x=>x.date.startsWith(mo)),pv=t.filter(x=>x.date.startsWith(pk));
+ const inc=sum(cm,'income'),exp=sum(cm,'expense'),acc=bal(a,t),cash=acc.reduce((s,x)=>s+x.bal,0),rec=owed(i,'sale'),pay=owed(i,'purchase');
+ const bf=t.filter(x=>x.date<mo+'-01'),open=a.reduce((s,x)=>s+ +x.opening,0)+sum(bf,'income')-sum(bf,'expense'),close=open+inc-exp;
+ const cat=(l,ty)=>{const o={};l.filter(x=>x.type===ty).forEach(x=>{const k=x.category||'Others';o[k]=(o[k]||0)+ +x.amount});return Object.entries(o).sort((p,q)=>q[1]-p[1])};
+ const ec=cat(cm,'expense'),ic=cat(cm,'income');
+ const port=[['Bank & cash',Math.max(cash,0)],['Receivables',rec]];h.forEach(x=>{const e=port.find(p=>p[0]===x.category);e?e[1]+= +x.value:port.push([x.category,+x.value])});
+ const ta=port.reduce((s,p)=>s+p[1],0);
+ const up=[...r.filter(x=>!x.done).map(x=>({t:x.title,d:x.due_date})),...i.filter(x=>x.amount-x.paid>0&&x.due_date).map(x=>({t:(x.kind==='sale'?'Collect invoice ':'Pay invoice ')+x.number,d:x.due_date}))].sort((p,q)=>p.d<q.d?-1:1).slice(0,5);
+ const card=(k,v,s,c='')=>`<div class="card"><div class=k>${k}</div><div class=v>${v}</div><div class="k ${c}">${s}</div></div>`;
+ m.innerHTML=`<div><input type=month id=mo value="${mo}"></div>
+ <div class="row c6">${card('Total Income',inr(inc),pct(inc,sum(pv,'income')),'up')}${card('Total Expenses',inr(exp),pct(exp,sum(pv,'expense')),'dn')}${card('Net Profit',inr(inc-exp),'This month',inc>=exp?'up':'dn')}${card('Total Receivables',inr(rec),'Due from clients')}${card('Total Payables',inr(pay),'Due to suppliers')}${card('Cash Balance',inr(cash),'In all accounts')}</div>
+ <div class="row c21"><div class=card><h3>Income vs Expenses (${mo.slice(0,4)})</h3><canvas id=c1 height=130></canvas></div><div class=card><h3>Expense Breakdown</h3><canvas id=c2></canvas></div></div>
+ <div class="row c4"><div class=card><h3>Business Portfolio</h3><canvas id=c3></canvas><p class=k>Total assets ${inr(ta)}</p></div>
+ <div class=card><h3>Cash Flow Summary</h3><table class=sm><tr><td>Opening balance<td class=r>${inr(open)}</tr><tr><td>Total cash inflows<td class="r up">${inr(inc)}</tr><tr><td>Total cash outflows<td class="r dn">${inr(exp)}</tr><tr><td><b>Closing balance</b><td class=r><b>${inr(close)}</b></tr></table><p class="${inc>=exp?'up':'dn'}">Cash flow is ${inc>=exp?'positive':'negative'} this month.</p></div>
+ <div class=card><h3>Top Income Sources</h3><table class=sm>${ic.map(x=>`<tr><td>${esc(x[0])}<td class=r>${inr(x[1])}</tr>`).join('')||'<tr><td>No income this month.</tr>'}</table></div>
+ <div class=card><h3>Upcoming Reminders</h3><table class=sm>${up.map(x=>`<tr><td>${esc(x.t)}<td class=r>${due(x.d)}</tr>`).join('')||'<tr><td>Nothing due. Add reminders on the Reminders page.</tr>'}</table></div></div>
+ <div class="row c21"><div class=card><h3>Recent Transactions</h3><table><tr><th>Date<th>Description<th>Category<th class=r>Amount</tr>${t.slice().sort((p,q)=>p.date<q.date?1:-1).slice(0,6).map(x=>`<tr><td>${x.date}<td>${esc(x.description)}<td>${esc(x.category)}<td class="r ${x.type==='income'?'up':'dn'}">${x.type==='income'?'':'-'}${inr(x.amount)}</tr>`).join('')||'<tr><td colspan=4>No transactions yet.</tr>'}</table></div>
+ <div class=card><h3>Account Balances</h3><table>${acc.map(x=>`<tr><td>${esc(x.name)}<td class=r>${inr(x.bal)}</tr>`).join('')||'<tr><td>No accounts yet. Add one on Banking & Accounts.</tr>'}</table></div></div>`;
+ $('#mo').onchange=e=>{mo=e.target.value||mo;render(m)};
+ const y=mo.slice(0,4),ks=[...Array(12)].map((_,n)=>y+'-'+String(n+1).padStart(2,'0'));
+ draw('c1',{type:'bar',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Income',data:ks.map(k=>sum(t.filter(x=>x.date.startsWith(k)),'income')),backgroundColor:'#16a34a'},{label:'Expenses',data:ks.map(k=>sum(t.filter(x=>x.date.startsWith(k)),'expense')),backgroundColor:'#ef4444'}]},options:{plugins:{legend:{position:'bottom'}}}});
+ const dn=(l)=>({type:'doughnut',data:{labels:l.map(x=>x[0]),datasets:[{data:l.map(x=>x[1]),backgroundColor:COL}]},options:{plugins:{legend:{position:'bottom'}}}});
+ draw('c2',dn(ec));draw('c3',dn(port));
+}
+boot('Dashboard',render);
+</script></body></html>

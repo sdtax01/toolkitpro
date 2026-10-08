@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Assets & Investments',async m=>{
+ const{h}=await load();
+ m.innerHTML=`<div class=card><h3>Add asset or investment</h3><form class=f id=f><input name=name placeholder="Name" required><select name=category><option>Investments<option>Fixed Assets<option>Cash in Hand<option>Other</select><input name=value type=number min=0 step=0.01 placeholder="Value (₹)" required><button>Save asset</button></form></div>
+ <div class=card><table><tr><th>Name<th>Category<th class=r>Value<th></tr>${h.map(x=>`<tr><td>${esc(x.name)}<td>${esc(x.category)}<td class=r>${inr(x.value)}<td><button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=4>No assets yet. These feed the dashboard portfolio chart.</tr>'}</table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(await ok(db.from('assets').insert({...d,value:+d.value})))$('#f').reset()};
+ m.querySelectorAll('.x').forEach(x=>x.onclick=()=>confirm('Delete this asset?')&&ok(db.from('assets').delete().eq('id',x.dataset.id)));
+});
+</script></body></html>

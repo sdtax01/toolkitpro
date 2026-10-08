@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+boot('Settings',async m=>{
+ const{S}=await load(),v=k=>esc(S[k]||'');
+ m.innerHTML=`<div class=card><h3>Business profile</h3><form class=f id=f><input name=business_name placeholder="Business name" value="${v('business_name')}"><input name=gstin placeholder=GSTIN value="${v('gstin')}"><input name=state placeholder="State (decides CGST/SGST vs IGST)" value="${v('state')}"><input name=phone placeholder=Phone value="${v('phone')}"><input name=email type=email placeholder="Business email" value="${v('email')}"><input name=address placeholder=Address value="${v('address')}"><select name=default_gst title="Default GST rate">${RATES.map(r=>`<option ${r==(S.default_gst??18)?'selected':''}>${r}`).join('')}</select><button>Save settings</button></form></div>
+ <div class=card><h3>Email</h3><p class=k>Emails are sent by the send-mail function on your Supabase project. Send yourself a test to confirm it works.</p><button class=g id=tm>Send test email</button></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));d.default_gst=+d.default_gst;if(await ok(S.id?db.from('settings').update(d).eq('id',S.id):db.from('settings').insert(d)))toast('Settings saved')};
+ $('#tm').onclick=()=>mail(S.email,'Toolkit Pro test email','This is a test email from Toolkit Pro.');
+});
+</script></body></html>

@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transactions · Toolkit Pro</title>
+<link rel="stylesheet" href="assets/app.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="assets/app.js"></script></head><body>
+<script>
+const ft=new URLSearchParams(location.search).get('type');
+const title=ft==='income'?'Income':ft==='expense'?'Expenses':'Transactions';
+boot(title,async m=>{
+ const[{data:a=[]},{data:t=[]}]=await Promise.all([db.from('accounts').select('*').order('name'),(ft?db.from('transactions').select('*,accounts(name)').eq('type',ft):db.from('transactions').select('*,accounts(name)')).order('date',{ascending:false})]);
+ 
+ m.innerHTML=`<div class=card><h3>Add ${ft||'transaction'}</h3><form class=f id=f>
+ <input type=date name=date required value="${new Date().toISOString().slice(0,10)}">
+ <input name=description placeholder="Description" required>
+ <input name=category placeholder="Category">
+ ${ft?'':'<select name=type><option value=income>Income<option value=expense>Expense</select>'}
+ <select name=account_id><option value="">No account${a.map(x=>`<option value="${x.id}">${esc(x.name)}`).join('')}</select>
+ <input name=amount type=number min=0.01 step=0.01 placeholder="Amount (₹)" required>
+ <button>Save ${ft||'transaction'}</button><button type=button class=g id=ac>+ Account</button></form></div>
+ <div class=card><table><tr><th>Date<th>Description<th>Category<th>Type<th>Account<th class=r>Amount<th></tr>${t.map(x=>`<tr><td>${x.date}<td>${esc(x.description)}<td>${esc(x.category)}<td>${x.type}<td>${esc(x.accounts?.name)}<td class="r ${x.type==='income'?'up':'dn'}">${x.type==='income'?'':'-'}${inr(x.amount)}<td><button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=7>Nothing here yet. Use the form above.</tr>'}</table></div>`;
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(ft)d.type=ft;if(!d.account_id)delete d.account_id;if(await ok(db.from('transactions').insert(d)))$('#f').reset()};
+ $('#ac').onclick=async()=>{const n=prompt('Account name (e.g. HDFC Bank)');if(!n)return;const o=prompt('Opening balance in ₹','0');await db.from('accounts').insert({name:n,opening:+o||0})};
+ m.querySelectorAll('.x').forEach(b=>b.onclick=async()=>{{if(!confirm('Delete this entry?'))return;const x=t.find(y=>y.id===b.dataset.id);if(x.invoice_id){const{data:v}=await db.from('invoices').select('*').eq('id',x.invoice_id);if(v&&v[0])await db.from('invoices').update({paid:Math.max(0,+v[0].paid-+x.amount)}).eq('id',v[0].id)}await ok(db.from('transactions').delete().eq('id',x.id))}});
+});
+</script></body></html>
