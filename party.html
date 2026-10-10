@@ -7,9 +7,10 @@ boot(kind==='client'?'Customer':'Supplier',async function render(m){
  $('h1').textContent=x.name;
  m.innerHTML=`<div class=noprint><a href="customers.html?kind=${x.kind}">← Back to list</a></div>
  <div class="row c21"><div class=card><h3>Details</h3><table class=sm><tr><td class=k>Email<td>${esc(x.email)}</tr><tr><td class=k>Phone<td>${esc(x.phone)}</tr><tr><td class=k>GSTIN<td>${esc(x.gstin)}</tr><tr><td class=k>State<td>${esc(x.state)}</tr></table></div>
- <div class=card><div class=k>Outstanding</div><div class=v>${inr2(o)}</div><a class=btn href="invoice-new.html?kind=${sale}&party=${id}">+ New ${sale==='sale'?'Invoice':'Bill'}</a> <button class=g id=ml>Email statement</button> <button class=x id=dl>Delete</button></div></div>
+ <div class=card><div class=k>Outstanding</div><div class=v>${inr2(o)}</div><a class=btn href="invoice-new.html?kind=${sale}&party=${id}">+ New ${sale==='sale'?'Invoice':'Bill'}</a> <button class=g id=ml>Email statement</button> <button class=g id=ed>Edit</button> <button class=x id=dl>Delete</button></div></div>
  <div class=card><h3>${sale==='sale'?'Invoices':'Bills'}</h3><table><tr><th>Date<th>Number<th>Due<th class=r>Amount<th class=r>Balance<th>Status</tr>${iv.map(y=>`<tr><td>${y.date}<td><a href="invoice.html?id=${y.id}&kind=${sale}">${esc(y.number)}</a><td>${y.due_date||''}<td class=r>${inr2(y.amount)}<td class=r>${inr2(y.amount-y.paid)}<td>${badge(y)}</tr>`).join('')||'<tr><td colspan=6>No documents yet.</tr>'}</table></div>`;
  $('#ml').onclick=()=>mail(x.email,'Statement of account: '+(x.name),`Dear ${x.name},\n\nOutstanding as of ${today()}: ${inr2(o)}\n${iv.filter(y=>y.amount-y.paid>0.005).map(y=>`- ${y.number}: ${inr2(y.amount-y.paid)}${y.due_date?' (due '+y.due_date+')':''}`).join('\n')}\n\nRegards,\nShree Digitax Solutions`);
+ $('#ed').onclick=()=>editBox('Edit '+(x.kind==='client'?'customer':'supplier'),[{n:'name',l:'Name',req:1},{n:'email',l:'Email',t:'email'},{n:'phone',l:'Phone'},{n:'gstin',l:'GSTIN'},{n:'state',l:'State (decides CGST/SGST or IGST)',full:1}],x,d=>ok(db.from('parties').update(nul(d)).eq('id',id))).then(()=>render(m));
  $('#dl').onclick=async()=>{if(confirm('Delete this contact and all its invoices?')&&await ok(db.from('parties').delete().eq('id',id)))location.href='customers.html?kind='+x.kind};
 },'customers.html?kind='+kind);
 </script></body></html>
