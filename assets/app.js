@@ -29,6 +29,18 @@ const toast=m=>{const d=document.createElement('div');d.className='toast';d.text
 const mail=async(to,s,b)=>{if(!to){alert('Add an email address for this contact first.');return}
  const{error}=await db.functions.invoke('send-mail',{body:{to,subject:s,body:b}});
  if(error){alert('Server mail failed: '+error.message+'. Opening your email app instead.');location.href=`mailto:${to}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`}else toast('Email sent to '+to)};
+function editBox(title,fields,vals,save){
+ return new Promise(res=>{
+  const o=document.createElement('div');o.className='modal';
+  const fld=f=>`<label class="${f.full?'full':''}">${esc(f.l)}${f.opts?`<select name="${f.n}">${f.opts.map(p=>{const v=Array.isArray(p)?p[0]:p,l=Array.isArray(p)?p[1]:p;return`<option value="${esc(v)}" ${String(vals[f.n]??'')===String(v)?'selected':''}>${esc(l)}</option>`}).join('')}</select>`:`<input name="${f.n}" type="${f.t||'text'}" ${f.req?'required':''} ${f.step?`step="${f.step}"`:''} ${f.min!=null?`min="${f.min}"`:''} value="${esc(vals[f.n]??'')}">`}</label>`;
+  o.innerHTML=`<div class=card><h3>${esc(title)}</h3><form class=g2>${fields.map(fld).join('')}<div class="f2 full"><button>Save changes</button><button type=button class=g data-c>Cancel</button></div></form></div>`;
+  document.body.appendChild(o);
+  const close=()=>{o.remove();res()};
+  o.querySelector('[data-c]').onclick=close;
+  o.addEventListener('mousedown',e=>{if(e.target===o)close()});
+  o.querySelector('form').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));if((await save(d))!==false){close();toast('Changes saved')}};
+ })}
+const nul=d=>Object.fromEntries(Object.entries(d).map(([k,v])=>[k,v===''?null:v]));
 function login(){document.body.innerHTML=`<form class="card login"><h3>Toolkit Pro</h3><input id=e type=email placeholder=Email required><input id=p type=password placeholder=Password required minlength=6><button>Sign in</button> <button type=button class=g id=su>Create account</button><p id=msg class=dn></p></form>`;
  const go=async up=>{const c={email:$('#e').value,password:$('#p').value};const{error}=await(up?db.auth.signUp(c):db.auth.signInWithPassword(c));error?$('#msg').textContent=error.message:location.reload()};
  document.forms[0].onsubmit=ev=>{ev.preventDefault();go(0)};$('#su').onclick=()=>go(1)}
@@ -41,4 +53,4 @@ async function boot(title,render,act){
  const side=async()=>{const{t,a,S}=await load(),mo=today().slice(0,7),l=t.filter(x=>x.date.startsWith(mo)),i=sum(l,'income'),e=sum(l,'expense');
   $('#qs').innerHTML=`<b>Quick Summary</b><small> This month</small><div>Total Income<span class=up>${inr(i)}</span></div><div>Total Expenses<span class=dn>${inr(e)}</span></div><div>Net Profit<span class=up>${inr(i-e)}</span></div><div>Cash Balance<b>${inr(bal(a,t).reduce((s,x)=>s+x.bal,0))}</b></div>`;if(S.business_name)$('#who').textContent=S.business_name};
  const run=async()=>{try{await render($('#main'));side().catch(()=>{})}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run.</div>'}};
- await run();db.channel('live').on('postgres_changes',{event:'*',schema:'public'},run).subscribe();}
+ window.refresh=run;await run();db.channel('live').on('postgres_changes',{event:'*',schema:'public'},run).subscribe();}
