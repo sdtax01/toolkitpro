@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+const kind=Q.get('kind')==='supplier'?'supplier':'client',sale=kind==='client'?'sale':'purchase',L=kind==='client'?'Customer':'Supplier';
+let q='';
+boot(L+'s',async function render(m){
+ const{p,i}=await load(),ps=p.filter(x=>x.kind===kind),iv=i.filter(x=>x.kind===sale);
+ const ob=id=>iv.filter(y=>y.party_id===id).reduce((s,y)=>s+y.amount-y.paid,0),tot=iv.reduce((s,y)=>s+y.amount-y.paid,0),od=iv.filter(y=>stat(y)[1]==='od').reduce((s,y)=>s+y.amount-y.paid,0);
+ const card=(k,v,c='')=>`<div class=card><div class=k>${k}</div><div class="v ${c}">${v}</div></div>`;
+ m.innerHTML=`<div class="row c4">${card(L+'s',ps.length)}${card('Outstanding',inr(tot))}${card('Overdue',inr(od),'dn')}<div class="card noprint"><button id=nw>+ New ${L}</button></div></div>
+ <div class=card><input id=s placeholder="Search by name, email or GSTIN" value="${esc(q)}" style="width:100%;max-width:360px;margin-bottom:10px"><table><tr><th>Name<th>Contact<th>State<th>GSTIN<th class=r>Outstanding</tr><tbody id=tb></tbody></table></div>
+ <div class=modal id=md hidden><div class=card><h3>New ${L}</h3><form id=f class=g2><label>Name<input name=name required></label><label>Email<input name=email type=email></label><label>Phone<input name=phone></label><label>GSTIN<input name=gstin></label><label class=full>State (decides CGST/SGST or IGST)<input name=state></label><div class="f2 full"><button>Save ${L}</button><button type=button class=g id=cx>Cancel</button></div></form></div></div>`;
+ const draw=()=>{const k=q.toLowerCase();$('#tb').innerHTML=ps.filter(x=>(x.name+' '+(x.email||'')+' '+(x.gstin||'')).toLowerCase().includes(k)).map(x=>`<tr><td><a href="party.html?id=${x.id}&kind=${kind}">${esc(x.name)}</a><td>${esc(x.email||x.phone||'')}<td>${esc(x.state)}<td>${esc(x.gstin)}<td class=r>${inr(ob(x.id))}</tr>`).join('')||'<tr><td colspan=5>No '+L.toLowerCase()+'s yet. Click New '+L+' to add one.</tr>'};draw();
+ $('#s').oninput=e=>{q=e.target.value;draw()};$('#nw').onclick=()=>{$('#md').hidden=false};$('#cx').onclick=()=>{$('#md').hidden=true};
+ $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries([...new FormData($('#f'))].filter(x=>x[1]!==''));if(await ok(db.from('parties').insert({...d,kind}))){toast(L+' saved');render(m)}};
+},'customers.html?kind='+kind);
+</script></body></html>

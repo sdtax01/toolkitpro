@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+const id=Q.get('id'),sk=Q.get('kind')==='purchase'?'purchase':'sale';
+boot('Invoice',async function render(m){
+ const{i,p,t,a,S}=await load(),x=i.find(y=>y.id===id);
+ if(!x){m.innerHTML='<div class=card>Not found. <a href="invoices.html?kind='+sk+'">Back to list</a></div>';return}
+ const sale=x.kind==='sale',P=p.find(y=>y.id===x.party_id)||{},pays=t.filter(y=>y.invoice_id===id).sort((u,v)=>u.date<v.date?-1:1),o=+(x.amount-x.paid).toFixed(2),rt=+x.gst_rate||0,tv=x.taxable==null?null:+x.taxable;
+ $('h1').textContent=(sale?'Invoice ':'Bill ')+x.number;
+ const row=(k,v,b)=>`<tr><td>${b?'<b>'+k+'</b>':k}<td class=r>${b?'<b>'+v+'</b>':v}</tr>`;
+ m.innerHTML=`<div class=noprint><a href="invoices.html?kind=${x.kind}">← Back to list</a> &nbsp;${badge(x)}</div>
+ <div class="row c21"><div class=card><h3><a href="party.html?id=${x.party_id}&kind=${sale?'client':'supplier'}">${esc(P.name)}</a></h3><p class=k>${esc(P.gstin?'GSTIN '+P.gstin:'')} ${esc(P.state||'')}<br>Date ${x.date}${x.due_date?' · Due '+x.due_date:''}</p>
+  <table>${tv==null?row('Amount (no GST breakup)',inr2(x.amount)):row('Taxable value',inr2(tv))+(x.igst>0?row('IGST ('+rt+'%)',inr2(x.igst)):(x.cgst>0||x.sgst>0)?row('CGST ('+rt/2+'%)',inr2(x.cgst))+row('SGST ('+rt/2+'%)',inr2(x.sgst)):row('GST (0%)',inr2(0)))}${row('Total',inr2(x.amount),1)}${row(sale?'Received':'Paid',inr2(x.paid))}${row('Balance due',inr2(o),1)}</table></div>
+ <div class="card noprint"><h3>${sale?'Record receipt':'Record payment'}</h3>${o>0.005?`<form id=pf class=g2><label>Amount (₹)<input name=amount type=number step=0.01 min=0.01 max="${o}" value="${o}" required></label><label>Date<input type=date name=date value="${today()}" required></label><label class=full>${sale?'Deposit into':'Pay from'}<select name=account_id>${a.map(y=>`<option value="${y.id}">${esc(y.name)}`).join('')||'<option value="">No account (add one under Banking)'}</select></label><div class="f2 full"><button>Save</button></div></form>`:'<p class=up>Fully settled.</p>'}
+  <p><button class=g id=ml>Email ${sale?'reminder':'update'}</button> <button class=g id=pr>Print</button> ${tv==null?'<button class=g id=gs>Set GST</button> ':''}<button class=x id=dl>Delete</button></p></div></div>
+ <div class=card><h3>Payments</h3><table><tr><th>Date<th>Account<th class=r>Amount<th class=noprint></tr>${pays.map(y=>`<tr><td>${y.date}<td>${esc(a.find(z=>z.id===y.account_id)?.name)}<td class=r>${inr2(y.amount)}<td class=noprint><button class=x data-id="${y.id}">Delete</button></tr>`).join('')||'<tr><td colspan=4>No payments yet.</tr>'}</table></div>`;
+ if($('#pf'))$('#pf').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#pf'))),amt=+d.amount;if(!(amt>0)||amt>o+0.005)return alert('Enter an amount up to the balance due.');
+  if(!(await ok(db.from('transactions').insert({date:d.date,description:(sale?'Receipt ':'Payment ')+x.number+' - '+(P.name||''),category:sale?'Sales':'Purchases',type:sale?'income':'expense',amount:amt,account_id:d.account_id||null,invoice_id:x.id}))))return;
+  await ok(db.from('invoices').update({paid:+(+x.paid+amt).toFixed(2)}).eq('id',x.id));render(m)};
+ m.querySelectorAll('.x[data-id]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this payment?'))return;const y=pays.find(z=>z.id===b.dataset.id);await ok(db.from('invoices').update({paid:Math.max(0,+(+x.paid-+y.amount).toFixed(2))}).eq('id',x.id));await ok(db.from('transactions').delete().eq('id',y.id));render(m)});
+ $('#ml').onclick=()=>mail(P.email,(sale?'Payment reminder: invoice ':'Payment update: invoice ')+x.number,`Dear ${P.name},\n\n${sale?`This is a gentle reminder that invoice ${x.number} dated ${x.date} for ${inr2(x.amount)} has ${inr2(o)} outstanding${x.due_date?', due on '+x.due_date:''}. Kindly arrange payment at the earliest.`:`We are processing payment against your invoice ${x.number} dated ${x.date}. Outstanding: ${inr2(o)}.`}\n\nRegards,\nShree Digitax Solutions`);
+ $('#pr').onclick=()=>window.print();
+ if($('#gs'))$('#gs').onclick=async()=>{if(await fixGst([x],S,p))render(m)};
+ $('#dl').onclick=async()=>{if(confirm('Delete this document? Recorded payments stay in Transactions.')&&await ok(db.from('invoices').delete().eq('id',id)))location.href='invoices.html?kind='+x.kind};
+},'invoices.html?kind='+sk);
+</script></body></html>

@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="stylesheet" href="assets/app.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script><script src="assets/app.js"></script></head><body><script>
+const sale=Q.get('kind')==='purchase'?'purchase':'sale',L=sale==='sale'?'Invoices':'Bills',N=sale==='sale'?'Invoice':'Bill';
+let tab='all',q='';
+boot(L,async function render(m){
+ const{p,i,S}=await load(),iv=i.filter(x=>x.kind===sale).sort((a,b)=>a.date<b.date?1:-1),P=id=>p.find(y=>y.id===id)?.name||'',mo=today().slice(0,7);
+ const out=l=>l.reduce((s,y)=>s+y.amount-y.paid,0),ST={all:()=>1,unpaid:x=>stat(x)[1]!=='ok'&&stat(x)[1]!=='od',overdue:x=>stat(x)[1]==='od',paid:x=>stat(x)[1]==='ok'};
+ const card=(k,v,c='')=>`<div class=card><div class=k>${k}</div><div class="v ${c}">${v}</div></div>`;
+ m.innerHTML=`<div class="row c4">${card('Outstanding',inr2(out(iv)))}${card('Overdue',inr2(out(iv.filter(ST.overdue))),'dn')}${card('Billed this month',inr2(iv.filter(x=>x.date.startsWith(mo)).reduce((s,x)=>s+ +x.amount,0)))}<div class="card noprint"><a class=btn href="invoice-new.html?kind=${sale}">+ New ${N}</a>${iv.some(x=>x.taxable==null)?'<p><button class=g id=gall>Set GST on old '+L.toLowerCase()+'</button></p>':''}</div></div>
+ <div class=card><div class=tabs>${Object.keys(ST).map(k=>`<button data-t="${k}" class="${k===tab?'on':''}">${k[0].toUpperCase()+k.slice(1)} (${iv.filter(ST[k]).length})</button>`).join('')}</div><input id=s placeholder="Search by number or name" value="${esc(q)}" style="width:100%;max-width:360px;margin-bottom:10px"><table><tr><th>Date<th>Number<th>${sale==='sale'?'Customer':'Supplier'}<th>Due<th class=r>Amount<th class=r>Balance<th>Status</tr><tbody id=tb></tbody></table></div>`;
+ const draw=()=>{const k=q.toLowerCase();$('#tb').innerHTML=iv.filter(ST[tab]).filter(x=>(x.number+' '+P(x.party_id)).toLowerCase().includes(k)).map(x=>`<tr><td>${x.date}<td><a href="invoice.html?id=${x.id}&kind=${sale}">${esc(x.number)}</a><td>${esc(P(x.party_id))}<td>${x.due_date||''}<td class=r>${inr2(x.amount)}<td class=r>${inr2(x.amount-x.paid)}<td>${badge(x)}</tr>`).join('')||'<tr><td colspan=7>Nothing here yet.</tr>'};draw();
+ $('#s').oninput=e=>{q=e.target.value;draw()};
+ m.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{tab=b.dataset.t;render(m)});
+ if($('#gall'))$('#gall').onclick=async()=>{if(await fixGst(iv.filter(x=>x.taxable==null),S,p))render(m)};
+},'invoices.html?kind='+sale);
+</script></body></html>
