@@ -5,7 +5,15 @@ const inr=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const today=()=>new Date().toISOString().slice(0,10);
 const RATES=[0,5,12,18,28];
-const NAV=[['index.html','Dashboard'],['overview.html','Overview'],['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['parties.html?kind=client','Clients & Sales'],['parties.html?kind=supplier','Suppliers & Purchases'],['banking.html','Banking & Accounts'],['assets.html','Assets & Investments'],['reports.html','Reports'],['budgets.html','Budgets'],['goals.html','Goals'],['taxes.html','Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders'],['settings.html','Settings']];
+const NAV=[['Home',[['index.html','Dashboard'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['',[['settings.html','Settings']]]];
+const Q=new URLSearchParams(location.search);
+const inr2=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const stat=x=>{const o=x.amount-x.paid;if(o<=0.005)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return+x.paid>0?['Partially paid','pp']:['Unpaid','du']};
+const badge=x=>{const[t,c]=stat(x);return`<span class="bd ${c}">${t}</span>`};
+async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices (0, 5, 12, 18, 28)',S.default_gst??18);if(ans===null)return false;const r=+ans;if(!RATES.includes(r)){alert('Enter one of: '+RATES.join(', '));return false}
+ const incl=confirm('Do the existing amounts already include GST?\nOK = included (total stays the same)\nCancel = GST is extra (total increases)');
+ for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?+(a-tv).toFixed(2):g.cgst+g.sgst+g.igst,c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:+(tax/2).toFixed(2),sgst:+(tax/2).toFixed(2),igst:0};
+  if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:+(tv+tax).toFixed(2)}).eq('id',x.id))))return false}toast('GST updated');return true}
 const load=async()=>{const q=n=>db.from(n).select('*').then(r=>{if(r.error)throw r.error;return r.data||[]});const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
 const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+ +x.amount,0);
 const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:+x.opening+sum(l,'income')-sum(l,'expense')}});
@@ -24,12 +32,13 @@ const mail=async(to,s,b)=>{if(!to){alert('Add an email address for this contact 
 function login(){document.body.innerHTML=`<form class="card login"><h3>Toolkit Pro</h3><input id=e type=email placeholder=Email required><input id=p type=password placeholder=Password required minlength=6><button>Sign in</button> <button type=button class=g id=su>Create account</button><p id=msg class=dn></p></form>`;
  const go=async up=>{const c={email:$('#e').value,password:$('#p').value};const{error}=await(up?db.auth.signUp(c):db.auth.signInWithPassword(c));error?$('#msg').textContent=error.message:location.reload()};
  document.forms[0].onsubmit=ev=>{ev.preventDefault();go(0)};$('#su').onclick=()=>go(1)}
-async function boot(title,render){
+async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
- const cur=location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')}</nav><div class=qs id=qs></div></aside><section><header><div><h1>${title}</h1><small id=who>Welcome back!</small></div><div><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main></main></section>`;
+ const cur=act||location.pathname.split('/').pop()+location.search;
+ document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs></div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main></main></section>`;
+ $('#mn').onclick=()=>document.body.classList.toggle('navopen');
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{t,a,S}=await load(),mo=today().slice(0,7),l=t.filter(x=>x.date.startsWith(mo)),i=sum(l,'income'),e=sum(l,'expense');
   $('#qs').innerHTML=`<b>Quick Summary</b><small> This month</small><div>Total Income<span class=up>${inr(i)}</span></div><div>Total Expenses<span class=dn>${inr(e)}</span></div><div>Net Profit<span class=up>${inr(i-e)}</span></div><div>Cash Balance<b>${inr(bal(a,t).reduce((s,x)=>s+x.bal,0))}</b></div>`;if(S.business_name)$('#who').textContent=S.business_name};
- const run=async()=>{try{await render($('#main'));side().catch(()=>{})}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that all three SQL files have been run.</div>'}};
+ const run=async()=>{try{await render($('#main'));side().catch(()=>{})}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run.</div>'}};
  await run();db.channel('live').on('postgres_changes',{event:'*',schema:'public'},run).subscribe();}
