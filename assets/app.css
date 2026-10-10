@@ -1,11 +1,12 @@
 *{box-sizing:border-box}
 html{background:#001330;-webkit-text-size-adjust:100%}
 body{margin:0 auto;max-width:1760px;display:flex;min-height:100vh;font:13.5px/1.45 Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#001330;color:#14213d}
-aside{overflow-y:auto;height:100vh;position:sticky;top:0;width:218px;flex:none;padding:10px;color:#c9d3ee;display:flex;flex-direction:column;gap:8px;scrollbar-width:thin}
-.brand{background:#fff;border-radius:12px;overflow:hidden}.brand img{display:block;width:100%;max-height:100px;object-fit:contain}
-nav a{display:block;padding:6px 10px;border-radius:7px;color:inherit;text-decoration:none;margin-bottom:1px;font-size:13px}nav a.on{background:#19223d;color:#fff;font-weight:600}nav a:hover{background:#0f1d3d;color:#fff}
-.grp{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:#6f82b3;margin:8px 10px 3px}
-.qs{background:#0a1c3a;border-radius:10px;padding:10px;margin-top:auto;font-size:12.5px}.qs div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.qs b{color:#fff}.qs .up{color:#4ade80}.qs .dn{color:#ff7b7b}
+aside{overflow:hidden;height:100vh;position:sticky;top:0;width:218px;flex:none;padding:10px;color:#c9d3ee;display:flex;flex-direction:column;gap:6px}
+.brand{flex:none;background:#fff;border-radius:12px;overflow:hidden}.brand img{display:block;width:100%;height:clamp(64px,12vh,130px);object-fit:contain}
+nav{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#2a3c6b transparent}
+nav a{display:block;padding:4px 10px;border-radius:7px;color:inherit;text-decoration:none;margin-bottom:1px;font-size:12.5px}nav a.on{background:#19223d;color:#fff;font-weight:600}nav a:hover{background:#0f1d3d;color:#fff}
+.grp{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#6f82b3;margin:6px 10px 2px}
+.qs{flex:none;background:#0a1c3a;border-radius:10px;padding:8px 10px;font-size:12px}@media(max-height:640px){.qs{display:none}}.qs div{display:flex;justify-content:space-between;gap:8px;padding:2px 0}.qs b{color:#fff}.qs .up{color:#4ade80}.qs .dn{color:#ff7b7b}
 section{flex:1;min-width:0;background:#f4f6fb;border-radius:14px;margin:8px 8px 8px 0;overflow:hidden}
 header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 20px;background:#fff;border-bottom:1px solid #e4e8f2}h1{margin:0;font-size:18px}header small{color:#5b6787}.hl{display:flex;align-items:center;gap:10px}.menu{display:none;font-size:18px;padding:4px 10px}
 main{padding:16px 20px;display:grid;gap:14px;align-content:start}
