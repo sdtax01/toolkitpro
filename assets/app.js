@@ -70,6 +70,7 @@ function login(){
     <button type="button" class="rf" id="rf" aria-label="Refresh captcha">${ic.refresh}</button>
     <div class="fld"><label for="cp" class="sr">Enter captcha</label><input id="cp" type="text" placeholder="Enter Captcha" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="5" required></div>
    </div>
+   <p class="cl" id="cl" hidden>Caps Lock is on</p>
    <p id="msg" class="msg" role="alert" aria-live="polite"></p>
    <button type="submit" class="go" id="si"><span class="lbl">${ic.enter}<span>Login</span></span><span class="spin" aria-hidden="true"></span></button>
    <div class="alt"><button type="button" class="lnk" id="fp">Forgot password?</button><button type="button" class="lnk" id="su">Create account</button></div>
@@ -105,6 +106,11 @@ function login(){
  $('#fp').onclick=async()=>{const e=$('#e').value.trim();if(!/^\S+@\S+\.\S+$/.test(e)){say('Enter your email ID above, then tap Forgot password.');$('#e').focus();return}
   busy(1);try{const{error}=await db.auth.resetPasswordForEmail(e,{redirectTo:location.href.split('#')[0]});error?say(error.message):say('Password reset link sent. Check your email.',1)}catch(x){say('Network problem. Please try again.')}busy(0)};
  form.querySelectorAll('.sb').forEach(b=>b.onclick=async()=>{busy(1);try{const{error}=await db.auth.signInWithOAuth({provider:b.dataset.p,options:{redirectTo:location.href.split('#')[0]}});if(error){say(error.message.includes('not enabled')||error.message.includes('Unsupported')?'This sign-in method is not enabled yet. Use email and password.':error.message);busy(0)}}catch(x){say('Network problem. Please try again.');busy(0)}});
+ const amb=$('.amb'),rm=matchMedia('(prefers-reduced-motion:reduce)').matches;
+ if(!rm)document.addEventListener('pointermove',ev=>{const x=ev.clientX/innerWidth-.5,y=ev.clientY/innerHeight-.5;amb.style.setProperty('--mx',x.toFixed(3));amb.style.setProperty('--my',y.toFixed(3));const r=form.getBoundingClientRect();form.style.setProperty('--gx',(ev.clientX-r.left)+'px');form.style.setProperty('--gy',(ev.clientY-r.top)+'px')});
+ $('#p').addEventListener('keyup',ev=>{if(ev.getModifierState)$('#cl').hidden=!ev.getModifierState('CapsLock')});$('#p').addEventListener('blur',()=>$('#cl').hidden=true);
+ $('#si').addEventListener('pointerdown',ev=>{if(rm||$('#si').disabled)return;const b=$('#si'),r=b.getBoundingClientRect(),d=document.createElement('i');d.className='rip';d.style.cssText='left:'+(ev.clientX-r.left)+'px;top:'+(ev.clientY-r.top)+'px';b.appendChild(d);setTimeout(()=>d.remove(),700)});
+ form.addEventListener('input',()=>{if(msg.classList.contains('er'))say('')});
  $('#e').focus()}
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();

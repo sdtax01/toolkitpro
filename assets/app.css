@@ -97,3 +97,14 @@ body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:
 @media(prefers-reduced-motion:reduce){.login,.login *,.dr,.blob{animation:none!important;transition:none!important}.login button.go::after{display:none}}
 @media(prefers-reduced-transparency:reduce){.glass{backdrop-filter:none;-webkit-backdrop-filter:none;background:#f3f9ff}}
 @media(forced-colors:active){.glass{border:2px solid CanvasText}.login button.go{border:2px solid ButtonText}}
+
+/* ---- Login interactivity ---- */
+.amb{--mx:0;--my:0}
+.dr{translate:calc(var(--mx)*var(--z,30)*-1px) calc(var(--my)*var(--z,30)*-1px);transition:translate .35s ease-out}
+.d1{--z:40}.d2{--z:70}.d3{--z:25}.d4{--z:55}.d5{--z:80}.d6{--z:35}
+.blob{translate:calc(var(--mx)*-22px) calc(var(--my)*-22px);transition:translate .5s ease-out}
+.login{background-image:radial-gradient(260px circle at var(--gx,50%) var(--gy,0%),#ffffffcc,transparent 70%),linear-gradient(160deg,#ffffffd9,#eaf4ffb3)}
+.cl{margin:-4px 2px 4px;font-size:12px;font-weight:600;color:#8a4b00}.cl[hidden]{display:none}
+.login button.go .rip{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#ffffff80;pointer-events:none;animation:a-rip .65s ease-out forwards}
+@keyframes a-rip{to{transform:scale(28);opacity:0}}
+@media(prefers-reduced-motion:reduce){.dr,.blob{translate:none!important}.login .rip{display:none}}
