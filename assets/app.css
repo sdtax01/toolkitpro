@@ -37,7 +37,7 @@ body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:
 .authwrap{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
 .glass{background:linear-gradient(160deg,#ffffffd9,#eaf4ffb3);border:1px solid #ffffffd0;border-radius:28px;box-shadow:0 30px 60px -20px #1f5fb54d,0 2px 0 #fff inset,0 0 0 1px #b9d3f24d;
  -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);overflow:visible}
-.login{width:min(400px,100%);margin:0;padding:26px 28px 26px;animation:a-in .7s cubic-bezier(.2,.8,.2,1) both}
+.login{width:min(400px,100%);margin:0;padding:26px 28px 26px;animation:a-card .6s cubic-bezier(0,0,.2,1) both}
 .login .alogo{display:block;width:min(210px,62%);height:auto;margin:0 auto 8px;animation:a-in .8s .1s cubic-bezier(.2,.8,.2,1) both}
 .login h1{margin:0;text-align:center;font-size:26px;letter-spacing:.2px;color:var(--a-b2)}
 .login .sub{margin:2px 0 18px;text-align:center;font-size:13px;color:var(--a-mut)}
@@ -108,3 +108,13 @@ body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:
 .login button.go .rip{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#ffffff80;pointer-events:none;animation:a-rip .65s ease-out forwards}
 @keyframes a-rip{to{transform:scale(28);opacity:0}}
 @media(prefers-reduced-motion:reduce){.dr,.blob{translate:none!important}.login .rip{display:none}}
+
+/* ---- Card entrance + slow mesh background ---- */
+@keyframes a-card{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.mesh{position:absolute;display:block;width:70vmax;height:70vmax;border-radius:50%;contain:strict;will-change:transform;
+ background:radial-gradient(circle at center,var(--mc) 0%,transparent 65%);opacity:.75;animation:a-mesh 28s ease-in-out infinite alternate}
+.m1{--mc:#8cc4f7;left:-25vmax;top:-30vmax}
+.m2{--mc:#a9d8ff;right:-30vmax;top:5vmax;animation-duration:34s;animation-delay:-9s}
+.m3{--mc:#7fb2f0;left:10vmax;bottom:-40vmax;animation-duration:40s;animation-delay:-17s}
+@keyframes a-mesh{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(8vmax,6vmax,0) scale(1.12)}}
+@media(prefers-reduced-motion:reduce){.login,.mesh{animation:none!important}.mesh{will-change:auto}}

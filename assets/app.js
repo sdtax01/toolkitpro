@@ -57,7 +57,7 @@ function login(){
   ['linkedin_oidc','LinkedIn','<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.4 9.5h2.6V18H6.4zM7.7 5.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM10.5 9.5H13v1.2c.4-.7 1.3-1.4 2.6-1.4 2.6 0 3.1 1.7 3.1 3.9V18h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2V18h-2.6z"/></svg>']
  ];
  document.body.innerHTML=`
- <div class="amb" aria-hidden="true"><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
+ <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
    <img class="alogo" src="assets/logo-login.png" alt="Shree Digitax Solutions" width="640" height="397">
