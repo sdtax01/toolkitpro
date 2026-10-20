@@ -29,3 +29,71 @@ td .g,td .x{margin-right:4px}
 @media print{aside,header,.noprint{display:none!important}body{background:#fff;display:block;max-width:none}section{margin:0;border-radius:0}}
 @media(max-width:900px){.menu{display:inline-block}aside{position:fixed;left:-260px;top:0;bottom:0;width:236px;z-index:30;transition:left .2s;background:#001330}body.navopen aside{left:0}section{margin:0;border-radius:0}.c21{grid-template-columns:1fr}}
 @media(max-width:560px){.g2{grid-template-columns:1fr}main{padding:12px}}
+/* ---- Login (glass) ---- */
+html.auth{background:#dcecfb}
+body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:#0b2a5b;position:relative;overflow-x:hidden;
+ --a-ink:#0b2a5b;--a-mut:#4a5f82;--a-b1:#1f6fe5;--a-b2:#0f4fc4;--a-line:#b9d3f2;--a-er:#b42318;--a-ok:#0f7a3d;
+ background:radial-gradient(120% 90% at 20% 0%,#f4f9ff 0%,#dcecfb 55%,#c9e0f8 100%)}
+.authwrap{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
+.glass{background:linear-gradient(160deg,#ffffffd9,#eaf4ffb3);border:1px solid #ffffffd0;border-radius:28px;box-shadow:0 30px 60px -20px #1f5fb54d,0 2px 0 #fff inset,0 0 0 1px #b9d3f24d;
+ -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);overflow:visible}
+.login{width:min(400px,100%);margin:0;padding:26px 28px 26px;animation:a-in .7s cubic-bezier(.2,.8,.2,1) both}
+.login .alogo{display:block;width:min(210px,62%);height:auto;margin:0 auto 8px;animation:a-in .8s .1s cubic-bezier(.2,.8,.2,1) both}
+.login h1{margin:0;text-align:center;font-size:26px;letter-spacing:.2px;color:var(--a-b2)}
+.login .sub{margin:2px 0 18px;text-align:center;font-size:13px;color:var(--a-mut)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.fld{position:relative;margin-bottom:12px;animation:a-in .6s both}.fld:nth-of-type(1){animation-delay:.2s}.fld:nth-of-type(2){animation-delay:.28s}
+.login .fld input{width:100%;margin:0;height:46px;padding:0 44px 0 42px;border:1px solid var(--a-line);border-radius:14px;background:#ffffffb8;color:var(--a-ink);font-size:14px;transition:border-color .2s,box-shadow .2s,background .2s}
+.login .fld input::placeholder{color:#5d7092}
+.login .fld input:hover{border-color:#8fb8ea}
+.login .fld input:focus-visible{outline:none;border-color:var(--a-b1);background:#fff;box-shadow:0 0 0 4px #1f6fe533}
+.login .fld input:invalid:not(:placeholder-shown):not(:focus){border-color:#e07a72}
+.ico{position:absolute;left:14px;top:50%;translate:0 -50%;width:20px;height:20px;color:var(--a-mut);pointer-events:none;transition:color .2s}
+.fld:focus-within .ico{color:var(--a-b1)}
+.ico svg,.eye svg,.rf svg,.go svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.login button.eye{position:absolute;right:6px;top:50%;translate:0 -50%;width:34px;height:34px;padding:7px;border:0;border-radius:10px;background:none;color:var(--a-mut)}
+.login button.eye:hover{background:#1f6fe51a;color:var(--a-b2)}
+.cap{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:center;margin:0 0 6px;padding:7px;border:1px solid var(--a-line);border-radius:14px;background:#ffffff80;animation:a-in .6s .36s both}
+.cap canvas{display:block;width:120px;height:35px;border-radius:9px;background:#e3effc}
+.cap .fld{margin:0;animation:none}.login .cap .fld input{height:38px;padding:0 10px;border-radius:10px;text-transform:uppercase;letter-spacing:2px;font-size:13px}.login .cap .fld input::placeholder{text-transform:none;letter-spacing:0}
+.login button.rf{width:34px;height:34px;padding:7px;border:0;border-radius:50%;background:#1f6fe51a;color:var(--a-b2);transition:rotate .5s,background .2s}
+.login button.rf:hover{background:#1f6fe533;rotate:180deg}
+.msg{min-height:20px;margin:6px 2px 8px;font-size:12.5px;line-height:1.35}.msg.er{color:var(--a-er)}.msg.ok{color:var(--a-ok)}.msg:not(:empty){animation:a-in .3s both}
+.login button.go{position:relative;overflow:hidden;width:100%;height:48px;border:0;border-radius:24px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;
+ background:linear-gradient(180deg,#3d8cf5 0%,var(--a-b1) 45%,var(--a-b2) 100%);box-shadow:0 10px 22px -8px #0f4fc499,0 1px 0 #ffffff80 inset;transition:transform .15s,box-shadow .2s,filter .2s;animation:a-in .6s .44s both}
+.login button.go::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,#ffffff55 50%,transparent 65%);translate:-120% 0;animation:a-shine 3.6s 1.2s infinite}
+.login button.go:hover{transform:translateY(-1px);box-shadow:0 14px 26px -8px #0f4fc4b3,0 1px 0 #ffffff80 inset}.login button.go:active{transform:translateY(1px)}
+.go .lbl{display:inline-flex;align-items:center;gap:10px}.go .lbl svg{width:20px;height:20px}
+.go .spin{display:none;position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;border:3px solid #ffffff66;border-top-color:#fff;border-radius:50%;animation:a-spin .7s linear infinite}
+.loading .go .lbl{opacity:0}.loading .go .spin{display:block}.loading .go::after{display:none}
+.login button:focus-visible{outline:3px solid #1f6fe580;outline-offset:2px}
+.login button:disabled{cursor:not-allowed;opacity:.65;transform:none}.loading .go:disabled{opacity:.9}
+.alt{display:flex;justify-content:space-between;gap:8px;margin:12px 2px 0}
+.login button.lnk{padding:4px 2px;border:0;background:none;color:var(--a-b2);font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer}.login button.lnk:hover{color:#0a3a9a}
+.or{display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--a-mut);font-size:12.5px}.or::before,.or::after{content:"";flex:1;height:1px;background:var(--a-line)}
+.soc{display:flex;justify-content:center;gap:14px}
+.login button.sb{width:46px;height:46px;padding:11px;border:1px solid #ffffffd0;border-radius:50%;background:linear-gradient(160deg,#fff,#e6f1ff);box-shadow:0 6px 14px -6px #1f5fb566;transition:transform .2s,box-shadow .2s;animation:a-pop .5s both}
+.soc .sb:nth-child(1){animation-delay:.5s}.soc .sb:nth-child(2){animation-delay:.58s}.soc .sb:nth-child(3){animation-delay:.66s}
+.login button.sb:hover{transform:translateY(-3px) scale(1.06);box-shadow:0 12px 20px -8px #1f5fb599}.sb svg{width:100%;height:100%}
+.login.shake{animation:a-shake .45s}
+/* ambient water droplets */
+.amb{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.dr,.blob{position:absolute;display:block}
+.dr{border-radius:50%;background:radial-gradient(circle at 30% 28%,#fff 0 9%,#ffffff55 10% 22%,#8cc4f7aa 45%,#3b8ee8cc 100%);box-shadow:inset -4px -6px 10px #1f6fe566,0 8px 18px -6px #1f6fe566;animation:a-float 7s ease-in-out infinite}
+.d1{width:44px;height:44px;left:11%;top:14%}.d2{width:20px;height:20px;left:22%;top:30%;animation-delay:-2s;animation-duration:6s}.d3{width:62px;height:62px;left:8%;bottom:20%;animation-delay:-4s;animation-duration:9s}
+.d4{width:34px;height:34px;right:14%;top:22%;animation-delay:-1s;animation-duration:8s}.d5{width:24px;height:24px;right:9%;bottom:30%;animation-delay:-3s}.d6{width:16px;height:16px;right:24%;bottom:12%;animation-delay:-5s;animation-duration:6.5s}
+.blob{width:clamp(120px,22vw,300px);aspect-ratio:1;background:radial-gradient(circle at 30% 25%,#ffffffcc 0 8%,#9ccbf8bb 30%,#3a8bea99 75%,#1f6fe566 100%);box-shadow:inset 8px 10px 24px #ffffff80,inset -10px -14px 30px #1f6fe566,0 24px 40px -18px #1f6fe566;animation:a-morph 11s ease-in-out infinite}
+.bl{left:max(-60px,calc(50% - 560px));top:30%;border-radius:62% 38% 55% 45%/45% 60% 40% 55%}
+.br{right:max(-60px,calc(50% - 560px));top:36%;border-radius:40% 60% 45% 55%/58% 42% 58% 42%;animation-delay:-5s}
+@keyframes a-in{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes a-pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes a-float{0%,100%{transform:translate(0,0)}50%{transform:translate(6px,-16px)}}
+@keyframes a-morph{0%,100%{border-radius:62% 38% 55% 45%/45% 60% 40% 55%;transform:translateY(0)}50%{border-radius:45% 55% 40% 60%/58% 42% 58% 42%;transform:translateY(-14px) rotate(4deg)}}
+@keyframes a-shine{0%,60%{translate:-120% 0}100%{translate:120% 0}}
+@keyframes a-spin{to{rotate:360deg}}
+@keyframes a-shake{0%,100%{translate:0}20%{translate:-8px}40%{translate:7px}60%{translate:-5px}80%{translate:3px}}
+@media(max-width:560px){.login{padding:22px 18px}.blob{opacity:.55}.cap{grid-template-columns:auto auto 1fr}.cap canvas{width:104px;height:31px}}
+@media(max-width:380px){.cap{grid-template-columns:1fr auto}.cap canvas{width:100%;height:36px}.cap .fld{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.login,.login *,.dr,.blob{animation:none!important;transition:none!important}.login button.go::after{display:none}}
+@media(prefers-reduced-transparency:reduce){.glass{backdrop-filter:none;-webkit-backdrop-filter:none;background:#f3f9ff}}
+@media(forced-colors:active){.glass{border:2px solid CanvasText}.login button.go{border:2px solid ButtonText}}

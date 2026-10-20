@@ -41,9 +41,71 @@ function editBox(title,fields,vals,save){
   o.querySelector('form').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));if((await save(d))!==false){close();toast('Changes saved')}};
  })}
 const nul=d=>Object.fromEntries(Object.entries(d).map(([k,v])=>[k,v===''?null:v]));
-function login(){document.body.innerHTML=`<form class="card login"><h3>Toolkit Pro</h3><input id=e type=email placeholder=Email required><input id=p type=password placeholder=Password required minlength=6><button>Sign in</button> <button type=button class=g id=su>Create account</button><p id=msg class=dn></p></form>`;
- const go=async up=>{const c={email:$('#e').value,password:$('#p').value};const{error}=await(up?db.auth.signUp(c):db.auth.signInWithPassword(c));error?$('#msg').textContent=error.message:location.reload()};
- document.forms[0].onsubmit=ev=>{ev.preventDefault();go(0)};$('#su').onclick=()=>go(1)}
+function login(){
+ document.documentElement.classList.add('auth');document.body.className='auth';
+ const ic={
+  user:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.2 3.6-7 8-7s8 2.8 8 7"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  eye:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeoff:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.5 6.6A17 17 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 4-.8M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v5h-5M4 19v-5h5"/><path d="M19 10A8 8 0 0 0 5.6 7.4M5 14a8 8 0 0 0 13.4 2.6"/></svg>',
+  enter:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 8l4 4-4 4M14 12H3"/></svg>'
+ };
+ const social=[
+  ['google','Google','<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.5c2.1-1.9 3.3-4.7 3.3-8z"/><path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.5-2.7c-1 .7-2.2 1-3.8 1-2.9 0-5.4-2-6.3-4.6H2.1v2.8A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.7 14c-.2-.7-.4-1.3-.4-2s.2-1.4.4-2V7.2H2.1a11 11 0 0 0 0 9.6L5.7 14z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.3 1.7l3.1-3.1A11 11 0 0 0 2.1 7.2L5.7 10c.9-2.6 3.4-4.6 6.3-4.6z"/></svg>'],
+  ['facebook','Facebook','<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#1877F2"/><path fill="#fff" d="M13.4 22v-8h2.7l.4-3.2h-3.1V8.9c0-.9.3-1.5 1.6-1.5h1.7V4.5c-.3 0-1.3-.1-2.4-.1-2.4 0-4 1.5-4 4.1v2.3H7.6V14h2.7v8z"/></svg>'],
+  ['linkedin_oidc','LinkedIn','<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="4" fill="#0A66C2"/><path fill="#fff" d="M6.4 9.5h2.6V18H6.4zM7.7 5.4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zM10.5 9.5H13v1.2c.4-.7 1.3-1.4 2.6-1.4 2.6 0 3.1 1.7 3.1 3.9V18h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2V18h-2.6z"/></svg>']
+ ];
+ document.body.innerHTML=`
+ <div class="amb" aria-hidden="true"><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
+ <main class="authwrap">
+  <form class="card login glass" novalidate aria-labelledby="lt">
+   <img class="alogo" src="assets/logo-login.png" alt="Shree Digitax Solutions" width="640" height="397">
+   <h1 id="lt">Login</h1>
+   <p class="sub">Welcome Back! Please login to continue.</p>
+   <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
+   <div class="fld"><label for="p" class="sr">Password</label><span class="ico">${ic.lock}</span><input id="p" name="password" type="password" placeholder="Password" autocomplete="current-password" required minlength="6"><button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false">${ic.eye}</button></div>
+   <div class="cap">
+    <canvas id="cv" width="150" height="44" role="img" aria-label="Captcha image"></canvas>
+    <button type="button" class="rf" id="rf" aria-label="Refresh captcha">${ic.refresh}</button>
+    <div class="fld"><label for="cp" class="sr">Enter captcha</label><input id="cp" type="text" placeholder="Enter Captcha" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="5" required></div>
+   </div>
+   <p id="msg" class="msg" role="alert" aria-live="polite"></p>
+   <button type="submit" class="go" id="si"><span class="lbl">${ic.enter}<span>Login</span></span><span class="spin" aria-hidden="true"></span></button>
+   <div class="alt"><button type="button" class="lnk" id="fp">Forgot password?</button><button type="button" class="lnk" id="su">Create account</button></div>
+   <div class="or"><span>Or Login With</span></div>
+   <div class="soc">${social.map(s=>`<button type="button" class="sb" data-p="${s[0]}" aria-label="Continue with ${s[1]}">${s[2]}</button>`).join('')}</div>
+  </form>
+ </main>`;
+ const form=document.forms[0],msg=$('#msg'),btns=[...form.querySelectorAll('button')];let code='';
+ const say=(t,ok)=>{msg.textContent=t||'';msg.className='msg'+(t?(ok?' ok':' er'):'');if(t&&!ok){form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake')}};
+ const busy=b=>{form.classList.toggle('loading',b);form.setAttribute('aria-busy',b);btns.forEach(x=>x.disabled=b)};
+ const cap=()=>{const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789',r=crypto.getRandomValues(new Uint8Array(5));code=[...r].map(n=>A[n%A.length]).join('');
+  const c=$('#cv'),x=c.getContext('2d'),w=c.width,h=c.height;x.clearRect(0,0,w,h);
+  const g=x.createLinearGradient(0,0,w,h);g.addColorStop(0,'#eaf3ff');g.addColorStop(1,'#d7e8fb');x.fillStyle=g;x.fillRect(0,0,w,h);
+  for(let i=0;i<7;i++){x.strokeStyle='rgba(31,79,216,'+(.15+Math.random()*.25)+')';x.lineWidth=1;x.beginPath();x.moveTo(Math.random()*w,Math.random()*h);x.bezierCurveTo(Math.random()*w,Math.random()*h,Math.random()*w,Math.random()*h,Math.random()*w,Math.random()*h);x.stroke()}
+  x.font='700 26px ui-monospace,Menlo,Consolas,monospace';x.textBaseline='middle';
+  [...code].forEach((ch,i)=>{x.save();x.translate(14+i*26,h/2+(Math.random()*8-4));x.rotate((Math.random()-.5)*.5);x.fillStyle='#0b2a6b';x.fillText(ch,0,0);x.restore()});
+  for(let i=0;i<30;i++){x.fillStyle='rgba(11,42,107,.3)';x.fillRect(Math.random()*w,Math.random()*h,1.5,1.5)}
+  $('#cp').value=''};
+ cap();$('#rf').onclick=()=>{cap();$('#cp').focus()};
+ $('#eye').onclick=()=>{const p=$('#p'),s=p.type==='password';p.type=s?'text':'password';$('#eye').innerHTML=s?ic.eyeoff:ic.eye;$('#eye').setAttribute('aria-pressed',s);$('#eye').setAttribute('aria-label',s?'Hide password':'Show password')};
+ const check=()=>{const e=$('#e').value.trim(),p=$('#p').value;
+  if(!e||!/^\S+@\S+\.\S+$/.test(e)){say('Enter a valid email ID.');$('#e').focus();return 0}
+  if(p.length<6){say('Password must be at least 6 characters.');$('#p').focus();return 0}
+  if($('#cp').value.trim().toUpperCase()!==code){say('Captcha does not match. Try the new one.');cap();$('#cp').focus();return 0}
+  say('');return 1};
+ const go=async up=>{if(!check())return;const c={email:$('#e').value.trim(),password:$('#p').value};busy(1);
+  try{const{data,error}=await(up?db.auth.signUp(c):db.auth.signInWithPassword(c));
+   if(error){say(error.message);cap();busy(0);return}
+   if(up&&!(data&&data.session)){say('Account created. Check your email to confirm it, then log in.',1);cap();busy(0);return}
+   say('Success! Opening your workspace…',1);location.reload()}
+  catch(err){say('Network problem. Please try again.');cap();busy(0)}};
+ form.onsubmit=ev=>{ev.preventDefault();go(0)};$('#su').onclick=()=>go(1);
+ $('#fp').onclick=async()=>{const e=$('#e').value.trim();if(!/^\S+@\S+\.\S+$/.test(e)){say('Enter your email ID above, then tap Forgot password.');$('#e').focus();return}
+  busy(1);try{const{error}=await db.auth.resetPasswordForEmail(e,{redirectTo:location.href.split('#')[0]});error?say(error.message):say('Password reset link sent. Check your email.',1)}catch(x){say('Network problem. Please try again.')}busy(0)};
+ form.querySelectorAll('.sb').forEach(b=>b.onclick=async()=>{busy(1);try{const{error}=await db.auth.signInWithOAuth({provider:b.dataset.p,options:{redirectTo:location.href.split('#')[0]}});if(error){say(error.message.includes('not enabled')||error.message.includes('Unsupported')?'This sign-in method is not enabled yet. Use email and password.':error.message);busy(0)}}catch(x){say('Network problem. Please try again.');busy(0)}});
+ $('#e').focus()}
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const cur=act||location.pathname.split('/').pop()+location.search;
