@@ -1,5 +1,6 @@
 const SUPABASE_URL='https://dpgkabvyappujokiujoh.supabase.co',SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRwZ2thYnZ5YXBwdWpva2l1am9oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0NzA5MzUsImV4cCI6MjEwNzA0NjkzNX0.iz4f1JYG3Sav4tLWDH1GPjXPxAD-U87ecRYrZKx8KLA';
 const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+try{const pc=document.createElement('link');pc.rel='preconnect';pc.href=SUPABASE_URL;pc.crossOrigin='';document.head.appendChild(pc)}catch(_){}
 const $=s=>document.querySelector(s);
 const inr=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
@@ -14,7 +15,8 @@ async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices 
  const incl=confirm('Do the existing amounts already include GST?\nOK = included (total stays the same)\nCancel = GST is extra (total increases)');
  for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?+(a-tv).toFixed(2):g.cgst+g.sgst+g.igst,c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:+(tax/2).toFixed(2),sgst:+(tax/2).toFixed(2),igst:0};
   if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:+(tv+tax).toFixed(2)}).eq('id',x.id))))return false}toast('GST updated');return true}
-const load=async()=>{const q=n=>db.from(n).select('*').then(r=>{if(r.error)throw r.error;return r.data||[]});const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
+let LP=null;const load0=async()=>{const q=n=>db.from(n).select('*').then(r=>{if(r.error)throw r.error;return r.data||[]});const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
+const load=()=>LP||load0();
 const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+ +x.amount,0);
 const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:+x.opening+sum(l,'income')-sum(l,'expense')}});
 const owed=(i,k)=>i.filter(x=>x.kind===k).reduce((s,x)=>s+(+x.amount-+x.paid),0);
@@ -40,6 +42,7 @@ function editBox(title,fields,vals,save){
   o.addEventListener('mousedown',e=>{if(e.target===o)close()});
   o.querySelector('form').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));if((await save(d))!==false){close();toast('Changes saved')}};
  })}
+const SKEL=`<div class=sk role=status aria-label="Loading"><div class=skr><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div><div class=skc><i class=b></i><i class=b></i></div><div class=skl><i class=b></i><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div></div>`,QSK='<div class=skq><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div>';
 const nul=d=>Object.fromEntries(Object.entries(d).map(([k,v])=>[k,v===''?null:v]));
 function login(){
  document.documentElement.classList.add('auth');document.body.className='auth';
@@ -60,7 +63,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png" alt="Shree Digitax Solutions" width="640" height="397">
+   <img class="alogo" src="assets/logo-login.png" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -115,10 +118,10 @@ function login(){
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const cur=act||location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs></div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main></main></section>`;
+ document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs>${QSK}</div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  $('#mn').onclick=()=>document.body.classList.toggle('navopen');
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{t,a,S}=await load(),mo=today().slice(0,7),l=t.filter(x=>x.date.startsWith(mo)),i=sum(l,'income'),e=sum(l,'expense');
   $('#qs').innerHTML=`<b>Quick Summary</b><small> This month</small><div>Total Income<span class=up>${inr(i)}</span></div><div>Total Expenses<span class=dn>${inr(e)}</span></div><div>Net Profit<span class=up>${inr(i-e)}</span></div><div>Cash Balance<b>${inr(bal(a,t).reduce((s,x)=>s+x.bal,0))}</b></div>`;if(S.business_name)$('#who').textContent=S.business_name};
- const run=async()=>{try{await render($('#main'));side().catch(()=>{})}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run.</div>'}};
- window.refresh=run;await run();db.channel('live').on('postgres_changes',{event:'*',schema:'public'},run).subscribe();}
+ const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run.</div>'}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
+ window.refresh=run;await run();let rt;db.channel('live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(run,400)}).subscribe();}

@@ -118,3 +118,13 @@ body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:
 .m3{--mc:#7fb2f0;left:10vmax;bottom:-40vmax;animation-duration:40s;animation-delay:-17s}
 @keyframes a-mesh{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(8vmax,6vmax,0) scale(1.12)}}
 @media(prefers-reduced-motion:reduce){.login,.mesh{animation:none!important}.mesh{will-change:auto}}
+
+/* ---- Loading skeletons (shimmer) ---- */
+.sk{display:grid;gap:14px}.skr{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px}.skc{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px}.skl{display:grid;gap:10px}
+.sk .b,.skq .b{position:relative;display:block;overflow:hidden;background:#e3e9f5;border-radius:12px}
+.skr .b{height:84px}.skc .b{height:260px}.skl .b{height:34px;border-radius:8px}
+.sk .b::after,.skq .b::after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 25%,#ffffffb8 50%,transparent 75%);translate:-100% 0;animation:sk-s 1.4s ease-in-out infinite}
+.skq{display:grid;gap:8px;padding:2px 0}.skq .b{height:14px;background:#17305c;border-radius:6px}.skq .b::after{background:linear-gradient(100deg,transparent 25%,#ffffff2e 50%,transparent 75%)}
+@keyframes sk-s{to{translate:100% 0}}
+@media(max-width:900px){.skc{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.sk .b::after,.skq .b::after{animation:none;display:none}}
