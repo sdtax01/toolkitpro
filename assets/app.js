@@ -63,7 +63,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261022" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -118,7 +118,7 @@ function login(){
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const cur=act||location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs>${QSK}</div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png?v=20261022" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs>${QSK}</div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  $('#mn').onclick=()=>document.body.classList.toggle('navopen');
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{t,a,S}=await load(),mo=today().slice(0,7),l=t.filter(x=>x.date.startsWith(mo)),i=sum(l,'income'),e=sum(l,'expense');
