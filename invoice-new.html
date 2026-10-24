@@ -1,7 +1,7 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261022"><script src="assets/vendor/supabase.js?v=20261022"></script><script src="assets/app.js?v=20261022"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script></head><body><script>
 const sale=Q.get('kind')==='purchase'?'purchase':'sale',kind=sale==='sale'?'client':'supplier',N=sale==='sale'?'Invoice':'Bill',P1=sale==='sale'?'Customer':'Supplier';
 boot('New '+N,async m=>{
- const{p,i,S}=await load(),ps=p.filter(x=>x.kind===kind),pre=Q.get('party')||'',no=(sale==='sale'?'INV-':'BILL-')+String(i.filter(x=>x.kind===sale).length+1).padStart(4,'0'),dd=(()=>{const d=new Date();d.setDate(d.getDate()+15);return d.toISOString().slice(0,10)})();
+ const{p,i,S}=await load(),ps=p.filter(x=>x.kind===kind),pre=Q.get('party')||'',no=(sale==='sale'?'INV-':'BILL-')+String(i.filter(x=>x.kind===sale).reduce((mx,x)=>Math.max(mx,parseInt(String(x.number).replace(/\D+/g,''),10)||0),i.filter(x=>x.kind===sale).length)+1).padStart(4,'0'),dd=(()=>{const d=new Date();d.setDate(d.getDate()+15);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
  if(!ps.length){m.innerHTML=`<div class=card>Add a ${P1.toLowerCase()} first. <a class=btn href="customers.html?kind=${kind}">Go to ${P1}s</a></div>`;return}
  m.innerHTML=`<form id=f class="row c21"><div class=card><h3>${N} details</h3><div class=g2>
  <label class=full>${P1}<select name=party_id required><option value="">Select ${P1.toLowerCase()}${ps.map(x=>`<option value="${x.id}" ${x.id===pre?'selected':''}>${esc(x.name)}`).join('')}</select></label>
@@ -9,10 +9,12 @@ boot('New '+N,async m=>{
  <label>Due date<input type=date name=due_date value="${dd}"></label><label>GST rate %<select name=gst_rate>${RATES.map(r=>`<option ${r==(S.default_gst??18)?'selected':''}>${r}`).join('')}</select></label>
  <label class=full>Taxable value (₹)<input name=taxable type=number min=0.01 step=0.01 required></label></div></div>
  <div class=card><h3>Summary</h3><div id=sum></div><p class=k id=pos></p><button>Save ${N}</button> <a class="btn" style="background:#eef1fb;color:#14213d" href="invoices.html?kind=${sale}">Cancel</a></div></form>`;
- const f=$('#f'),calc=()=>{const e=f.elements,tv=+e.taxable.value||0,rt=+e.gst_rate.value||0,pt=ps.find(y=>y.id===e.party_id.value),g=gst(tv,rt,S,pt),tx=g.cgst+g.sgst+g.igst;return{tv,rt,g,pt,total:+(tv+tx).toFixed(2)}};
+ const f=$('#f'),calc=()=>{const e=f.elements,tv=+e.taxable.value||0,rt=+e.gst_rate.value||0,pt=ps.find(y=>y.id===e.party_id.value),g=gst(tv,rt,S,pt),tx=rup(paise(g.cgst)+paise(g.sgst)+paise(g.igst));return{tv,rt,g,pt,total:rup(paise(tv)+paise(tx))}};
  const upd=()=>{const{tv,rt,g,pt,total}=calc();$('#sum').innerHTML=`<table class=sm><tr><td>Taxable value<td class=r>${inr2(tv)}</tr>${g.igst?`<tr><td>IGST (${rt}%)<td class=r>${inr2(g.igst)}</tr>`:`<tr><td>CGST (${rt/2}%)<td class=r>${inr2(g.cgst)}</tr><tr><td>SGST (${rt/2}%)<td class=r>${inr2(g.sgst)}</tr>`}<tr><td><b>Total</b><td class=r><b>${inr2(total)}</b></tr></table>`;$('#pos').textContent=!S.state||!pt?.state?'Set your state in Settings and the contact state for the correct tax split.':g.igst?'Inter-state supply: IGST applies.':'Intra-state supply: CGST + SGST apply.'};
  f.oninput=upd;f.onchange=upd;upd();
- f.onsubmit=async e=>{e.preventDefault();const e2=f.elements,{tv,rt,g,total}=calc(),r=await db.from('invoices').insert({party_id:e2.party_id.value,number:e2.number.value,date:e2.date.value,due_date:e2.due_date.value||null,taxable:tv,gst_rate:rt,...g,amount:total,kind:sale}).select().single();
-  if(r.error)return alert(r.error.message);location.href='invoice.html?id='+r.data.id+'&kind='+sale};
+ f.onsubmit=e=>{e.preventDefault();return guard(f,async()=>{const e2=f.elements,{tv,rt,g,total}=calc();
+  if(i.some(x=>x.kind===sale&&String(x.number).trim().toLowerCase()===e2.number.value.trim().toLowerCase()))return alert(N+' number '+e2.number.value+' already exists. Use a unique number.');
+  const r=await db.from('invoices').insert({party_id:e2.party_id.value,number:e2.number.value,date:e2.date.value,due_date:e2.due_date.value||null,taxable:tv,gst_rate:rt,...g,amount:total,kind:sale}).select().single();
+  if(r.error)return alert(r.error.message);location.href='invoice.html?id='+r.data.id+'&kind='+sale})};
 },'invoices.html?kind='+sale);
 </script></body></html>

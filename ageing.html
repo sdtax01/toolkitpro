@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+const kind=Q.get('kind')==='purchase'?'purchase':'sale',cust=kind==='sale',W=cust?'Customer':'Supplier';
+boot(cust?'Debtors Ageing':'Creditors Ageing',async function render(m){
+ const{i,p,S}=await load(),A=TP.ageing(i,p,kind,today()),T=A.totals,B=TP.BUCKETS;
+ const pc=v=>A.totals.total?Math.round(v/A.totals.total*100):0,cl={cur:'#2f5ee8',b1:'#d97706',b2:'#ea580c',b3:'#dc2626',b4:'#7f1d1d'};
+ const card=(k,v,c)=>`<div class=card><div class=k>${k}</div><div class="v ${c||''}">${inr2(v)}</div></div>`;
+ m.innerHTML=`<div class=noprint><div class=tabs role=tablist aria-label="Report type"><button role=tab class="${cust?'on':''}" aria-selected="${cust}" data-k=sale>Debtors (customers owe you)</button><button role=tab class="${cust?'':'on'}" aria-selected="${!cust}" data-k=purchase>Creditors (you owe suppliers)</button></div></div>
+ <div class="row c4 rep">${card('Total outstanding',T.total)}${card('Overdue',A.overdue,A.overdue>0?'dn':'')}${card('Over 90 days',T.b4,T.b4>0?'dn':'')}<div class=card><div class=k>${cust?'Customers':'Suppliers'} with dues</div><div class=v>${A.rows.length}</div></div></div>
+ <div class=card><h3>Ageing summary as on ${A.asOf}</h3>
+  <div class=agebar role=img aria-label="${B.map(([k,l])=>l+' '+pc(T[k])+'%').join(', ')}">${B.map(([k,l])=>T[k]>0?`<i style="width:${Math.max(pc(T[k]),2)}%;background:${cl[k]}"></i>`:'').join('')}</div>
+  <ul class=agekey>${B.map(([k,l])=>`<li><i style="background:${cl[k]}" aria-hidden="true"></i>${l}: <b>${inr2(T[k])}</b> (${pc(T[k])}%)</li>`).join('')}</ul>
+  <p class=k>Days overdue are counted from the due date${A.noDue?'; '+A.noDue+' open item(s) have no due date, so their invoice date is used':''}.</p></div>
+ <div class=card><div class="f2 noprint" style="justify-content:space-between;flex-wrap:wrap;margin-bottom:8px"><h3 style="margin:0">By ${W.toLowerCase()}</h3><div class=f2><button class=g id=csv ${A.rows.length?'':'disabled'}>Export CSV</button><button class=g id=pr>Print</button>${cust?`<button id=bulk ${A.rows.some(r=>r.overdue>0)?'':'disabled'}>Email reminders to overdue customers</button>`:''}</div></div>
+ <table><caption class=sr>${cust?'Debtors':'Creditors'} ageing by ${W.toLowerCase()}</caption><thead><tr><th scope=col>${W}</th>${B.map(([k,l])=>`<th scope=col class=r>${l}</th>`).join('')}<th scope=col class=r>Total</th><th scope=col class=r>Oldest (days)</th><th scope=col class=noprint><span class=sr>Actions</span></th></tr></thead><tbody>
+ ${A.rows.map(r=>`<tr><th scope=row><a href="party.html?id=${r.id}&kind=${cust?'client':'supplier'}">${esc(r.name)}</a></th>${B.map(([k])=>`<td class=r>${r.b[k]?inr2(r.b[k]):'-'}</td>`).join('')}<td class=r><b>${inr2(r.b.total)}</b></td><td class="r ${r.oldest>90?'dn':''}">${r.oldest||'-'}</td><td class=noprint>${r.party?`<a href="statement.html?id=${r.id}&kind=${cust?'client':'supplier'}">Statement</a>`:''}</td></tr>`).join('')||`<tr><td colspan=9>Nothing outstanding. All ${cust?'customer invoices':'supplier bills'} are settled.</td></tr>`}
+ </tbody>${A.rows.length?`<tfoot><tr><th scope=row>Total</th>${B.map(([k])=>`<td class=r><b>${inr2(T[k])}</b></td>`).join('')}<td class=r><b>${inr2(T.total)}</b></td><td></td><td class=noprint></td></tr></tfoot>`:''}</table></div>`;
+ m.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{location.href='ageing.html?kind='+b.dataset.k});
+ $('#pr').onclick=()=>window.print();
+ if($('#csv'))$('#csv').onclick=()=>TP.download((cust?'debtors':'creditors')+'-ageing-'+A.asOf+'.csv',[[W,...B.map(x=>x[1]),'Total','Oldest (days)'],...A.rows.map(r=>[r.name,...B.map(([k])=>r.b[k]),r.b.total,r.oldest]),['Total',...B.map(([k])=>T[k]),T.total,'']]);
+ if($('#bulk'))$('#bulk').onclick=async e=>{const btn=e.currentTarget,od=A.rows.filter(r=>r.overdue>0),to=od.filter(r=>r.party&&r.party.email).slice(0,50),skip=od.length-to.length;
+  if(!to.length)return alert('No overdue customer has an email address saved.');
+  if(!confirm('Send a payment reminder email to '+to.length+' customer(s)?'+(skip?'\n'+skip+' will be skipped because they have no email address.':'')+'\nEach customer receives one email listing their overdue invoices.'))return;
+  btn.disabled=true;btn.setAttribute('aria-busy','true');let sent=0;const failed=[],biz=S.business_name||'Shree Digitax Solutions';
+  for(const r of to){const l=r.invoices.filter(x=>x.overdueDays>0);
+   const body='Dear '+r.name+',\n\nThis is a gentle reminder that the following invoice(s) are overdue:\n'+l.map(x=>'- '+x.number+(x.due?' (due '+x.due+')':'')+': '+inr2(x.balance)+', '+x.overdueDays+' days overdue').join('\n')+'\n\nTotal overdue: '+inr2(r.overdue)+'\n\nKindly arrange payment at the earliest. Please ignore this note if you have already paid.\n\nRegards,\n'+biz;
+   try{const{error}=await db.functions.invoke('send-mail',{body:{to:r.party.email,subject:'Payment reminder: '+inr2(r.overdue)+' overdue',body}});error?failed.push(r.name+': '+error.message):sent++}catch(x){failed.push(r.name+': '+x.message)}
+   await new Promise(z=>setTimeout(z,300))}
+  btn.disabled=false;btn.removeAttribute('aria-busy');toast(sent+' reminder(s) sent'+(failed.length?', '+failed.length+' failed':''));if(failed.length)alert('Could not send to:\n'+failed.join('\n'))};
+},'ageing.html?kind='+kind);
+</script></body></html>

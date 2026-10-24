@@ -4,30 +4,36 @@ try{const pc=document.createElement('link');pc.rel='preconnect';pc.href=SUPABASE
 const $=s=>document.querySelector(s);
 const inr=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+/* Money: amounts are INR, held as integer paise for arithmetic, rounded half-up to 2 decimals, stored as numeric(.,2). */
+const paise=n=>Math.round((+n||0)*100+(n<0?-1e-9:1e-9)),rup=p=>p/100;
 const RATES=[0,5,12,18,28];
-const NAV=[['Home',[['index.html','Dashboard'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['',[['settings.html','Settings']]]];
+const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['',[['settings.html','Settings']]]];
 const Q=new URLSearchParams(location.search);
 const inr2=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const stat=x=>{const o=x.amount-x.paid;if(o<=0.005)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return+x.paid>0?['Partially paid','pp']:['Unpaid','du']};
+const stat=x=>{const o=paise(x.amount)-paise(x.paid);if(o<=0)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return+x.paid>0?['Partially paid','pp']:['Unpaid','du']};
 const badge=x=>{const[t,c]=stat(x);return`<span class="bd ${c}">${t}</span>`};
 async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices (0, 5, 12, 18, 28)',S.default_gst??18);if(ans===null)return false;const r=+ans;if(!RATES.includes(r)){alert('Enter one of: '+RATES.join(', '));return false}
  const incl=confirm('Do the existing amounts already include GST?\nOK = included (total stays the same)\nCancel = GST is extra (total increases)');
- for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?+(a-tv).toFixed(2):g.cgst+g.sgst+g.igst,c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:+(tax/2).toFixed(2),sgst:+(tax/2).toFixed(2),igst:0};
-  if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:+(tv+tax).toFixed(2)}).eq('id',x.id))))return false}toast('GST updated');return true}
+ for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?rup(paise(a)-paise(tv)):rup(paise(g.cgst)+paise(g.sgst)+paise(g.igst)),hp=Math.floor(paise(tax)/2),c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:rup(hp),sgst:rup(paise(tax)-hp),igst:0};
+  if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:rup(paise(tv)+paise(tax))}).eq('id',x.id))))return false}toast('GST updated');return true}
 let LP=null;const load0=async()=>{const q=n=>db.from(n).select('*').then(r=>{if(r.error)throw r.error;return r.data||[]});const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
 const load=()=>LP||load0();
-const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+ +x.amount,0);
-const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:+x.opening+sum(l,'income')-sum(l,'expense')}});
-const owed=(i,k)=>i.filter(x=>x.kind===k).reduce((s,x)=>s+(+x.amount-+x.paid),0);
-const spent=(t,c,mo)=>t.filter(x=>x.type==='expense'&&x.date.startsWith(mo)&&(x.category||'').trim().toLowerCase()===c.trim().toLowerCase()).reduce((s,x)=>s+ +x.amount,0);
+const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+paise(x.amount),0)/100;
+const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:rup(paise(x.opening)+paise(sum(l,'income'))-paise(sum(l,'expense')))}});
+const owed=(i,k)=>i.filter(x=>x.kind===k).reduce((s,x)=>s+paise(x.amount)-paise(x.paid),0)/100;
+const spent=(t,c,mo)=>t.filter(x=>x.type==='expense'&&x.date.startsWith(mo)&&(x.category||'').trim().toLowerCase()===c.trim().toLowerCase()).reduce((s,x)=>s+paise(x.amount),0)/100;
 const days=d=>Math.round((new Date(d)-new Date(today()))/864e5);
 const due=d=>{const n=days(d);return n<0?`Overdue ${-n}d`:n===0?'Due today':`Due in ${n} days`};
 const taxOf=x=>(+x.cgst||0)+(+x.sgst||0)+(+x.igst||0);
-const gst=(taxable,rate,S,P)=>{const tax=+(taxable*rate/100).toFixed(2),inter=!!(S?.state&&P?.state&&S.state.trim().toLowerCase()!==P.state.trim().toLowerCase());return inter?{cgst:0,sgst:0,igst:tax}:{cgst:+(tax/2).toFixed(2),sgst:+(tax/2).toFixed(2),igst:0}};
+const gst=(taxable,rate,S,P)=>{const tp=Math.round(paise(taxable)*rate/100+1e-9),tax=rup(tp),inter=!!(S?.state&&P?.state&&S.state.trim().toLowerCase()!==P.state.trim().toLowerCase()),h=Math.floor(tp/2);return inter?{cgst:0,sgst:0,igst:tax}:{cgst:rup(h),sgst:rup(tp-h),igst:0}};
 const bar=(v,max)=>{const p=max?v/max*100:0;return`<div class=bar><i class="${p>100?'dn':''}" style="width:${Math.min(100,p)}%"></i></div>`};
 const ok=async p=>{const r=await p;if(r.error){alert(r.error.message);return false}return true};
-const toast=m=>{const d=document.createElement('div');d.className='toast';d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),3500)};
+const toast=m=>{const d=document.createElement('div');d.className='toast';d.setAttribute('role','status');d.setAttribute('aria-live','polite');d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),3500)};
+/* Double-submit guard: one in-flight save per form, buttons disabled meanwhile (idempotent against double clicks/Enter). */
+const guard=async(f,fn)=>{if(!f||f.dataset.busy)return;f.dataset.busy=1;f.setAttribute('aria-busy','true');const bs=[...f.querySelectorAll('button')],pv=bs.map(b=>b.disabled);bs.forEach(b=>b.disabled=true);try{return await fn()}finally{delete f.dataset.busy;f.removeAttribute('aria-busy');bs.forEach((b,i)=>b.disabled=pv[i])}};
+/* True when a Supabase RPC has not been installed yet (migrations not run): callers fall back to the older client-side flow. */
+const noFn=e=>!!e&&(e.code==='PGRST202'||e.code==='42883'||/could not find the function|schema cache/i.test(e.message||''));
 const mail=async(to,s,b)=>{if(!to){alert('Add an email address for this contact first.');return}
  const{error}=await db.functions.invoke('send-mail',{body:{to,subject:s,body:b}});
  if(error){alert('Server mail failed: '+error.message+'. Opening your email app instead.');location.href=`mailto:${to}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`}else toast('Email sent to '+to)};
@@ -35,12 +41,14 @@ function editBox(title,fields,vals,save){
  return new Promise(res=>{
   const o=document.createElement('div');o.className='modal';
   const fld=f=>`<label class="${f.full?'full':''}">${esc(f.l)}${f.opts?`<select name="${f.n}">${f.opts.map(p=>{const v=Array.isArray(p)?p[0]:p,l=Array.isArray(p)?p[1]:p;return`<option value="${esc(v)}" ${String(vals[f.n]??'')===String(v)?'selected':''}>${esc(l)}</option>`}).join('')}</select>`:`<input name="${f.n}" type="${f.t||'text'}" ${f.req?'required':''} ${f.step?`step="${f.step}"`:''} ${f.min!=null?`min="${f.min}"`:''} value="${esc(vals[f.n]??'')}">`}</label>`;
-  o.innerHTML=`<div class=card><h3>${esc(title)}</h3><form class=g2>${fields.map(fld).join('')}<div class="f2 full"><button>Save changes</button><button type=button class=g data-c>Cancel</button></div></form></div>`;
+  const prev=document.activeElement;o.innerHTML=`<div class=card role=dialog aria-modal=true aria-labelledby=ebt><h3 id=ebt>${esc(title)}</h3><form class=g2>${fields.map(fld).join('')}<div class="f2 full"><button>Save changes</button><button type=button class=g data-c>Cancel</button></div></form></div>`;
   document.body.appendChild(o);
-  const close=()=>{o.remove();res()};
+  const close=()=>{o.remove();try{prev&&prev.focus&&prev.focus()}catch(_){}res()};
+  o.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close()}else if(e.key==='Tab'){const f=[...o.querySelectorAll('input,select,button:not(:disabled)')];if(!f.length)return;const a=f[0],z=f[f.length-1];if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}}});
+  const f1=o.querySelector('input,select');if(f1)f1.focus();
   o.querySelector('[data-c]').onclick=close;
   o.addEventListener('mousedown',e=>{if(e.target===o)close()});
-  o.querySelector('form').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData(e.target));if((await save(d))!==false){close();toast('Changes saved')}};
+  o.querySelector('form').onsubmit=e=>{e.preventDefault();const fm=e.target,d=Object.fromEntries(new FormData(fm));return guard(fm,async()=>{if((await save(d))!==false){close();toast('Changes saved')}})};
  })}
 const SKEL=`<div class=sk role=status aria-label="Loading"><div class=skr><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div><div class=skc><i class=b></i><i class=b></i></div><div class=skl><i class=b></i><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div></div>`,QSK='<div class=skq><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div>';
 const nul=d=>Object.fromEntries(Object.entries(d).map(([k,v])=>[k,v===''?null:v]));
@@ -63,7 +71,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261022" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261024" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -118,10 +126,10 @@ function login(){
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const cur=act||location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<aside><div class=brand><img src="assets/logo.png?v=20261022" alt="Shree Digitax Solutions"></div><nav>${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}">${n}</a>`).join('')).join('')}</nav><div class=qs id=qs>${QSK}</div></aside><section><header><div class=hl><button class="g menu" id=mn>☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
- $('#mn').onclick=()=>document.body.classList.toggle('navopen');
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261024" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}"${(h===cur||(h==='index.html'&&cur===''))?' aria-current="page"':''}>${n}</a>`).join('')).join('')}</nav><div class=qs id=qs>${QSK}</div></aside><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="main">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><a class=btn href="transactions.html">+ Add Transaction</a> <button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ $('#mn').onclick=()=>{const o=document.body.classList.toggle('navopen');$('#mn').setAttribute('aria-expanded',o)};
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{t,a,S}=await load(),mo=today().slice(0,7),l=t.filter(x=>x.date.startsWith(mo)),i=sum(l,'income'),e=sum(l,'expense');
   $('#qs').innerHTML=`<b>Quick Summary</b><small> This month</small><div>Total Income<span class=up>${inr(i)}</span></div><div>Total Expenses<span class=dn>${inr(e)}</span></div><div>Net Profit<span class=up>${inr(i-e)}</span></div><div>Cash Balance<b>${inr(bal(a,t).reduce((s,x)=>s+x.bal,0))}</b></div>`;if(S.business_name)$('#who').textContent=S.business_name};
- const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp}catch(e){$('#main').innerHTML='<div class="card dn">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run.</div>'}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
+ const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp}catch(e){$('#main').innerHTML='<div class="card dn" role="alert">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run. <button class=g id=retry>Retry</button></div>';const rb=$('#retry');if(rb)rb.onclick=()=>{$('#main').innerHTML=SKEL;run()}}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
  window.refresh=run;await run();let rt;db.channel('live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(run,400)}).subscribe();}

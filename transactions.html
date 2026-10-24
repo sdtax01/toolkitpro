@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261022"><script src="assets/vendor/supabase.js?v=20261022"></script><script src="assets/app.js?v=20261022"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script></head><body><script>
 const ft=Q.get('type');
 const title=ft==='income'?'Income':ft==='expense'?'Expenses':'Transactions';
 boot(title,async m=>{
@@ -12,16 +12,16 @@ boot(title,async m=>{
  <input name=amount type=number min=0.01 step=0.01 placeholder="Amount (₹)" required>
  <button>Save ${ft||'transaction'}</button><button type=button class=g id=ac>+ Account</button></form></div>
  <div class=card><table><tr><th>Date<th>Description<th>Category<th>Type<th>Account<th class=r>Amount<th></tr>${t.map(x=>`<tr><td>${x.date}<td>${esc(x.description)}<td>${esc(x.category)}<td>${x.type}<td>${esc(x.accounts?.name)}<td class="r ${x.type==='income'?'up':'dn'}">${x.type==='income'?'':'-'}${inr(x.amount)}<td><button class=g data-e="${x.id}">Edit</button><button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=7>Nothing here yet. Use the form above.</tr>'}</table></div>`;
- $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(ft)d.type=ft;if(!d.account_id)delete d.account_id;if(await ok(db.from('transactions').insert(d))){$('#f').reset();refresh()}};
+ $('#f').onsubmit=e=>{e.preventDefault();const fm=$('#f');return guard(fm,async()=>{const d=Object.fromEntries(new FormData(fm));if(ft)d.type=ft;if(!d.account_id)delete d.account_id;d.amount=rup(paise(d.amount));if(await ok(db.from('transactions').insert(d))){fm.reset();refresh()}})};
  $('#ac').onclick=async()=>{const n=prompt('Account name (e.g. HDFC Bank)');if(!n)return;const o=prompt('Opening balance in ₹','0');if(await ok(db.from('accounts').insert({name:n,opening:+o||0})))refresh()};
  m.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>{const x=t.find(y=>y.id===b.dataset.e);
   const fl=[{n:'date',l:'Date',t:'date',req:1},{n:'description',l:'Description',req:1,full:1},{n:'category',l:'Category'},...(x.invoice_id?[]:[{n:'type',l:'Type',opts:[['income','Income'],['expense','Expense']]}]),{n:'account_id',l:'Account',opts:[['','No account'],...a.map(y=>[y.id,y.name])]},{n:'amount',l:'Amount (₹)',t:'number',step:'0.01',min:'0.01',req:1}];
   editBox('Edit transaction'+(x.invoice_id?' (linked to an invoice)':''),fl,x,async d=>{const amt=+d.amount;
    if(x.invoice_id){const{data:v}=await db.from('invoices').select('*').eq('id',x.invoice_id),iv=v&&v[0];
-    if(iv){const np=+(+iv.paid-+x.amount+amt).toFixed(2);if(np>+iv.amount+0.005){alert('That amount is more than the invoice balance allows (invoice total '+inr2(iv.amount)+').');return false}
+    if(iv){const np=rup(paise(iv.paid)-paise(x.amount)+paise(amt));if(paise(np)>paise(iv.amount)){alert('That amount is more than the invoice balance allows (invoice total '+inr2(iv.amount)+').');return false}
      if(!(await ok(db.from('invoices').update({paid:Math.max(0,np)}).eq('id',iv.id))))return false}}
    const u={date:d.date,description:d.description,category:d.category||null,account_id:d.account_id||null,amount:amt};if(d.type)u.type=d.type;
    return ok(db.from('transactions').update(u).eq('id',x.id))}).then(()=>refresh())});
- m.querySelectorAll('.x').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this entry?'))return;const x=t.find(y=>y.id===b.dataset.id);if(x.invoice_id){const{data:v}=await db.from('invoices').select('*').eq('id',x.invoice_id);if(v&&v[0])await db.from('invoices').update({paid:Math.max(0,+v[0].paid-+x.amount)}).eq('id',v[0].id)}if(await ok(db.from('transactions').delete().eq('id',x.id)))refresh()});
+ m.querySelectorAll('.x').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this entry?'))return;const x=t.find(y=>y.id===b.dataset.id);if(x.invoice_id){const{data:v}=await db.from('invoices').select('*').eq('id',x.invoice_id);if(v&&v[0])await db.from('invoices').update({paid:Math.max(0,rup(paise(v[0].paid)-paise(x.amount)))}).eq('id',v[0].id)}if(await ok(db.from('transactions').delete().eq('id',x.id)))refresh()});
 });
 </script></body></html>

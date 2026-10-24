@@ -18,3 +18,12 @@ Static multi-page accounting site + Supabase backend.
 ## Update notes
 - Edit buttons added for customers/suppliers, invoices/bills, transactions (linked receipts keep invoice balances in sync), accounts, assets, budgets, goals, reminders and documents.
 - Layout is width-capped and charts sit in fixed-height boxes, so the dashboard looks the same at any browser zoom.
+
+## Phase 0 (database safety) and Phase 1 (debtors/creditors reports)
+Nothing here is required for the app to keep working: the app uses the new database functions only if they exist.
+- `supabase/migrations/`: run **in order**, in Supabase > SQL Editor, on a staging project first, after a backup.
+  `000_diagnostics.sql` (read-only; every query should return zero rows) -> `001_constraints.sql` -> `002_payment_functions.sql` -> `003_audit.sql`.
+  Each has a `_down.sql` that undoes it. `migrations/optional/` (004 stricter deletes, 005 two-decimal money columns) are optional; read the comment at the top of each first.
+- New pages: `daily.html` (Daily Summary), `ageing.html?kind=sale|purchase` (Debtors / Creditors Ageing, CSV export, bulk email reminders), `statement.html?id=...` (party statement).
+  Also linked from the Customer/Supplier page ("Statement"). They only read existing data.
+- Tests: `node tests/phase1.test.js` (no install needed); `tests/sql/phase0_test.sql` (needs a local Postgres, see the comments in `tests/sql/supabase_mock.sql`); `tests/browser-smoke.js` (needs Playwright).

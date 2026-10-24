@@ -133,3 +133,51 @@ body.auth{display:block;max-width:none;min-height:100vh;min-height:100dvh;color:
 /* soft motion when the device asks for reduced motion: opacity-only, no movement */
 @keyframes a-fade{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){form.login{animation:a-fade .5s ease-out both!important}}
+
+/* ==== Toolkit Pro hardening (additive; appended so nothing above is altered) ==== */
+:root{--tp-navy:#11246b;--tp-blue:#1f4fd8;--tp-ink:#14213d;--tp-mut:#4f5c7c;--tp-line:#d5dbec;--tp-ok:#166534;--tp-er:#b42318;--tp-focus:#1f4fd8;--tp-r:8px;--tp-s1:4px;--tp-s2:8px;--tp-s3:12px;--tp-s4:16px;--tp-dur:.18s}
+/* keyboard focus: visible on every interactive element, never on mouse click */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,[tabindex]:focus-visible{outline:3px solid var(--tp-focus);outline-offset:2px;border-radius:var(--tp-r)}
+nav a:focus-visible,aside button:focus-visible{outline-color:#9db8ff}
+/* skip link */
+.skip{position:absolute;left:8px;top:-60px;z-index:100;background:#fff;color:var(--tp-navy);padding:8px 14px;border-radius:var(--tp-r);font-weight:600;transition:top var(--tp-dur)}
+.skip:focus{top:8px}
+/* hover + disabled + busy states */
+button,.btn,input,select{transition:background-color var(--tp-dur),border-color var(--tp-dur),box-shadow var(--tp-dur),opacity var(--tp-dur)}
+button:not(.g):not(.x):not(.eye):not(.rf):not(.lnk):not(.sb):not(.go):hover,.btn:hover{filter:brightness(1.1)}
+button.g:hover{background:#e0e6f8}
+button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
+form[aria-busy=true]{cursor:progress}
+form[aria-busy=true] button:disabled{cursor:progress}
+/* validation (only after the user has interacted) */
+input:user-invalid,select:user-invalid{border-color:var(--tp-er);box-shadow:0 0 0 3px #b4231826}
+input[aria-invalid=true]{border-color:var(--tp-er)}
+.field-error{color:var(--tp-er);font-size:12px}
+/* empty state rows */
+td[colspan]:only-child{color:var(--tp-mut);text-align:center;padding:20px 6px}
+/* alerts and toast variants */
+[role=alert].card{border-left:4px solid var(--tp-er)}
+.toast{box-shadow:0 8px 24px #0004;animation:tp-toast .22s ease-out both;max-width:min(92vw,420px)}
+.toast.er{background:var(--tp-er)}
+@keyframes tp-toast{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+/* modal entrance */
+.modal .card{animation:tp-pop .18s ease-out both}
+@keyframes tp-pop{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+/* touch targets */
+@media(pointer:coarse){button,.btn,select,input{min-height:40px}nav a{padding:8px 10px}}
+/* higher-contrast muted text on dark sidebar group labels */
+.grp{color:#8fa2d4}
+/* respect reduced motion everywhere */
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important}.toast,.modal .card{animation:none!important}button,.btn,input,select,aside{transition:none!important}}
+@media(forced-colors:active){button,.btn{border:1px solid ButtonText}:focus-visible{outline:3px solid Highlight}}
+@media print{.skip,.toast{display:none!important}}
+
+/* ---- Phase 1 reports ---- */
+.agebar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:#e7ebf5;margin:4px 0 10px}.agebar i{display:block;height:100%}
+.agekey{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;margin:0 0 6px;font-size:12.5px}.agekey li{display:flex;align-items:center;gap:6px}.agekey i{width:10px;height:10px;border-radius:2px;display:inline-block}
+tfoot th,tfoot td{border-top:2px solid #c9d1e6;border-bottom:0}th[scope=row]{font-weight:500;text-align:left}tfoot th[scope=row]{font-weight:700}
+.tabs button[aria-selected=true]{color:#11246b;border-color:#11246b;font-weight:600}
+caption.sr{position:absolute}
+@media print{.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}a{color:inherit}main{padding:0}}
+@media(max-width:560px){.row.rep{grid-template-columns:repeat(2,minmax(0,1fr))}.row.rep .v{font-size:17px}}
+.rpt td:first-child{white-space:nowrap}

@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+const id=Q.get('id');let from=Q.get('from')??TP.fyStart(today()),to=Q.get('to')??today();
+boot('Statement of account',async function render(m){
+ const{p,i,t,S}=await load(),x=p.find(y=>y.id===id);
+ if(!x){m.innerHTML='<div class=card>Contact not found. <a href="customers.html?kind=client">Back to customers</a></div>';return}
+ const cust=x.kind==='client',sale=cust?'sale':'purchase',st=TP.statement(x,i,t,from||null,to||null),back='party.html?id='+id+'&kind='+x.kind;
+ $('h1').textContent='Statement: '+x.name;
+ const card=(k,v,c)=>`<div class=card><div class=k>${k}</div><div class="v ${c||''}">${inr2(v)}</div></div>`;
+ m.innerHTML=`<div class=noprint><a href="${back}">← Back to ${cust?'customer':'supplier'}</a></div>
+ <form id=pf class="card noprint" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end"><label>From<input type=date name=from value="${esc(from)}"></label><label>To<input type=date name=to value="${esc(to)}"></label><button>Apply</button><button type=button class=g id=fy>This financial year</button><button type=button class=g id=all>All dates</button></form>
+ <div class=card><h3 style="margin-bottom:2px">${esc(S.business_name||'Shree Digitax Solutions')}</h3><p class=k style="margin:0 0 8px">${esc(S.gstin?'GSTIN '+S.gstin:'')} ${esc(S.address||'')}</p>
+  <b>${esc(x.name)}</b><p class=k style="margin:2px 0 0">${esc(x.gstin?'GSTIN '+x.gstin:'')} ${esc(x.state||'')}<br>${esc(cust?'Sales ledger':'Purchase ledger')}, ${from?esc(from):'start'} to ${to?esc(to):'today'}</p></div>
+ ${st.mismatches.length?`<div class="card" role=alert><b>Data check:</b> ${st.mismatches.length} document(s) show a paid amount that differs from the payments linked to them (${st.mismatches.slice(0,5).map(y=>esc(y.number)+': recorded '+inr2(y.recorded)+', linked '+inr2(y.linked)).join('; ')}${st.mismatches.length>5?'; ...':''}). This statement follows the linked payments; the party page follows the recorded paid amount. Review those documents before sending.</div>`:''}
+ <div class="row c4 rep">${card('Opening balance',st.opening)}${card(cust?'Invoiced':'Billed',st.billed)}${card(cust?'Received':'Paid',st.paid)}${card('Closing balance',st.closing,st.closing>0?'dn':'')}</div>
+ <div class=card><div class="f2 noprint" style="justify-content:flex-end;flex-wrap:wrap;margin-bottom:8px"><button class=g id=csv>Export CSV</button><button class=g id=pr>Print</button><button id=ml>Email statement</button></div>
+ <table class=rpt><caption class=sr>Statement of account for ${esc(x.name)}</caption><thead><tr><th scope=col>Date</th><th scope=col>Type</th><th scope=col>Reference</th><th scope=col class=r>${cust?'Invoiced':'Billed'}</th><th scope=col class=r>${cust?'Received':'Paid'}</th><th scope=col class=r>Balance</th></tr></thead><tbody>
+ <tr><td>${from||''}<td colspan=4><i>Opening balance</i><td class=r>${inr2(st.opening)}</tr>
+ ${st.rows.map(r=>`<tr><td>${r.date}<td>${r.type}<td>${esc(r.ref)}<td class=r>${r.billed?inr2(r.billed):''}<td class=r>${r.paid?inr2(r.paid):''}<td class=r>${inr2(r.balance)}</tr>`).join('')||'<tr><td colspan=6>No entries in this period.</tr>'}
+ </tbody><tfoot><tr><th scope=row colspan=3>Closing balance</th><td class=r><b>${inr2(st.billed)}</b><td class=r><b>${inr2(st.paid)}</b><td class=r><b>${inr2(st.closing)}</b></tr></tfoot></table></div>`;
+ $('#pf').onsubmit=e=>{e.preventDefault();const d=new FormData($('#pf'));from=d.get('from')||'';to=d.get('to')||'';if(from&&to&&from>to)return alert('"From" date must be on or before "To" date.');history.replaceState(null,'','statement.html?id='+id+'&from='+from+'&to='+to);render(m)};
+ $('#fy').onclick=()=>{from=TP.fyStart(today());to=today();render(m)};
+ $('#all').onclick=()=>{from='';to='';render(m)};
+ $('#pr').onclick=()=>window.print();
+ $('#csv').onclick=()=>TP.download('statement-'+x.name.replace(/[^\w]+/g,'-')+'-'+(to||today())+'.csv',[['Date','Type','Reference',cust?'Invoiced':'Billed',cust?'Received':'Paid','Balance'],['','Opening balance','','','',st.opening],...st.rows.map(r=>[r.date,r.type,r.ref,r.billed||'',r.paid||'',r.balance]),['','Closing balance','',st.billed,st.paid,st.closing]]);
+ $('#ml').onclick=()=>mail(x.email,'Statement of account: '+x.name,`Dear ${x.name},\n\nStatement of account ${from||'from the beginning'} to ${to||today()}:\nOpening balance: ${inr2(st.opening)}\n${cust?'Invoiced':'Billed'}: ${inr2(st.billed)}\n${cust?'Received':'Paid'}: ${inr2(st.paid)}\nClosing balance: ${inr2(st.closing)}\n\nPlease reconcile with your records and let us know of any difference.\n\nRegards,\n${S.business_name||'Shree Digitax Solutions'}`);
+},'customers.html?kind='+(Q.get('kind')==='supplier'?'supplier':'client'));
+</script></body></html>
