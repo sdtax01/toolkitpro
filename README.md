@@ -23,7 +23,17 @@ Static multi-page accounting site + Supabase backend.
 Nothing here is required for the app to keep working: the app uses the new database functions only if they exist.
 - `supabase/migrations/`: run **in order**, in Supabase > SQL Editor, on a staging project first, after a backup.
   `000_diagnostics.sql` (read-only; every query should return zero rows) -> `001_constraints.sql` -> `002_payment_functions.sql` -> `003_audit.sql`.
-  Each has a `_down.sql` that undoes it. `migrations/optional/` (004 stricter deletes, 005 two-decimal money columns) are optional; read the comment at the top of each first.
+  Each has an undo script in `supabase/undo/` (kept out of `migrations/` so it can never run by accident). `migrations/optional/` (004 stricter deletes, 005 two-decimal money columns) are optional; read the comment at the top of each first.
 - New pages: `daily.html` (Daily Summary), `ageing.html?kind=sale|purchase` (Debtors / Creditors Ageing, CSV export, bulk email reminders), `statement.html?id=...` (party statement).
   Also linked from the Customer/Supplier page ("Statement"). They only read existing data.
 - Tests: `node tests/phase1.test.js` (no install needed); `tests/sql/phase0_test.sql` (needs a local Postgres, see the comments in `tests/sql/supabase_mock.sql`); `tests/browser-smoke.js` (needs Playwright).
+
+## Phase 2 (double-entry ledger)
+Optional and switched off until you press a button. Run in order after Phase 0, on staging first, after a backup:
+`supabase/migrations/010_ledger_core.sql` -> `011_ledger_posting.sql` -> `012_ledger_functions.sql`. Undo everything: `supabase/undo/012_ledger_down.sql` (removes the ledger only; invoices, transactions and parties are untouched).
+Then open **Books > Ledger Setup** and press *Set up ledger*. It builds the chart of accounts and posts balanced journals for all existing invoices, payments, transactions and bank opening balances.
+- After setup every invoice, bill, payment and transaction posts automatically. Editing or deleting one posts a reversal plus a new entry; posted journals can never be edited or deleted.
+- Screens: Trial Balance, General Ledger, Cash Book, Day Book, Journal Entry (manual, with reversal), Chart of Accounts, Ledger Setup (period lock, reconciliation, sync check).
+- Period lock stops adding, editing or deleting anything dated on or before the locked date.
+- Tests: `tests/sql/phase2_test.sql` (`psql -v with_p0=1 -v dump=/tmp/ledger_dump.json -f ...`), `node tests/phase2.test.js /tmp/ledger_dump.json`.
+- Known limits: manual journals cannot touch Debtors/Creditors (use invoices and payments); invoices without a GST breakup post their whole amount to Sales; ledger text for a renamed party updates only when that party's invoices are next edited.

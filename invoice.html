@@ -13,23 +13,24 @@ boot('Invoice',async function render(m){
   <p><button class=g id=ml>Email ${sale?'reminder':'update'}</button> <button class=g id=pr>Print</button> <button class=g id=ed>Edit</button> ${tv==null?'<button class=g id=gs>Set GST</button> ':''}<button class=x id=dl>Delete</button></p></div></div>
  <div class=card><h3>Payments</h3><table><tr><th>Date<th>Account<th class=r>Amount<th class=noprint></tr>${pays.map(y=>`<tr><td>${y.date}<td>${esc(a.find(z=>z.id===y.account_id)?.name)}<td class=r>${inr2(y.amount)}<td class=noprint><button class=x data-id="${y.id}">Delete</button></tr>`).join('')||'<tr><td colspan=4>No payments yet.</tr>'}</table></div>`;
  if($('#pf'))$('#pf').onsubmit=e=>{e.preventDefault();const pf=$('#pf');return guard(pf,async()=>{const d=Object.fromEntries(new FormData(pf)),amt=rup(paise(d.amount));if(!(amt>0)||paise(amt)>paise(o))return alert('Enter an amount up to the balance due.');
+  if(await lockedBlock(d.date))return;
   const desc=(sale?'Receipt ':'Payment ')+x.number+' - '+(P.name||''),rp=await db.rpc('record_payment',{p_invoice:x.id,p_amount:amt,p_date:d.date,p_account:d.account_id||null,p_description:desc});
   if(!rp.error){render(m);return}if(!noFn(rp.error))return alert(rp.error.message);
   const ins=await db.from('transactions').insert({date:d.date,description:(sale?'Receipt ':'Payment ')+x.number+' - '+(P.name||''),category:sale?'Sales':'Purchases',type:sale?'income':'expense',amount:amt,account_id:d.account_id||null,invoice_id:x.id}).select().single();
   if(ins.error)return alert(ins.error.message);
   if(!(await ok(db.from('invoices').update({paid:rup(paise(x.paid)+paise(amt))}).eq('id',x.id)))){await db.from('transactions').delete().eq('id',ins.data.id);return}
   render(m)})};
- m.querySelectorAll('.x[data-id]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this payment?'))return;const y=pays.find(z=>z.id===b.dataset.id);const rd=await db.rpc('delete_payment',{p_txn:y.id});if(!rd.error){render(m);return}if(!noFn(rd.error)){alert(rd.error.message);return}
+ m.querySelectorAll('.x[data-id]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this payment?'))return;const y=pays.find(z=>z.id===b.dataset.id);if(await lockedBlock(y.date))return;const rd=await db.rpc('delete_payment',{p_txn:y.id});if(!rd.error){render(m);return}if(!noFn(rd.error)){alert(rd.error.message);return}
   const np=Math.max(0,rup(paise(x.paid)-paise(y.amount)));if(!(await ok(db.from('invoices').update({paid:np}).eq('id',x.id))))return;if(!(await ok(db.from('transactions').delete().eq('id',y.id)))){await db.from('invoices').update({paid:x.paid}).eq('id',x.id)}render(m)});
  $('#ml').onclick=()=>mail(P.email,(sale?'Payment reminder: invoice ':'Payment update: invoice ')+x.number,`Dear ${P.name},\n\n${sale?`This is a gentle reminder that invoice ${x.number} dated ${x.date} for ${inr2(x.amount)} has ${inr2(o)} outstanding${x.due_date?', due on '+x.due_date:''}. Kindly arrange payment at the earliest.`:`We are processing payment against your invoice ${x.number} dated ${x.date}. Outstanding: ${inr2(o)}.`}\n\nRegards,\nShree Digitax Solutions`);
  $('#ed').onclick=()=>{const ps=p.filter(y=>y.kind===(sale?'client':'supplier'));
   editBox('Edit '+(sale?'invoice':'bill'),[{n:'party_id',l:sale?'Customer':'Supplier',opts:ps.map(y=>[y.id,y.name]),full:1},{n:'number',l:'Number',req:1},{n:'date',l:'Date',t:'date',req:1},{n:'due_date',l:'Due date',t:'date'},{n:'taxable',l:'Taxable value (₹)',t:'number',step:'0.01',min:'0.01',req:1},{n:'gst_rate',l:'GST rate %',opts:RATES.map(String)}],
   {...x,taxable:x.taxable==null?x.amount:x.taxable,gst_rate:x.taxable==null?(S.default_gst??18):x.gst_rate},
-  async d=>{const tv=+d.taxable,rt=+d.gst_rate,g=gst(tv,rt,S,ps.find(y=>y.id===d.party_id)),amount=rup(paise(tv)+paise(g.cgst)+paise(g.sgst)+paise(g.igst));
+  async d=>{if(await lockedBlock(x.date,d.date))return false;const tv=+d.taxable,rt=+d.gst_rate,g=gst(tv,rt,S,ps.find(y=>y.id===d.party_id)),amount=rup(paise(tv)+paise(g.cgst)+paise(g.sgst)+paise(g.igst));
    if(paise(amount)<paise(x.paid)){alert('The new total ('+inr2(amount)+') is less than the amount already '+(sale?'received':'paid')+' ('+inr2(x.paid)+'). Delete or reduce the payments first.');return false}
    return ok(db.from('invoices').update({party_id:d.party_id,number:d.number,date:d.date,due_date:d.due_date||null,taxable:tv,gst_rate:rt,...g,amount}).eq('id',id))}).then(()=>render(m))};
  $('#pr').onclick=()=>window.print();
  if($('#gs'))$('#gs').onclick=async()=>{if(await fixGst([x],S,p))render(m)};
- $('#dl').onclick=async()=>{if(confirm('Delete this document? Recorded payments stay in Transactions.')&&await ok(db.from('invoices').delete().eq('id',id)))location.href='invoices.html?kind='+x.kind};
+ $('#dl').onclick=async()=>{if(await lockedBlock(x.date,...pays.map(y=>y.date)))return;if(confirm('Delete this document? Recorded payments stay in Transactions.')&&await ok(db.from('invoices').delete().eq('id',id)))location.href='invoices.html?kind='+x.kind};
 },'invoices.html?kind='+sk);
 </script></body></html>

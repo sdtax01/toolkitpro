@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+let asOf=Q.get('asof')||today(),showZero=false;
+boot('Trial Balance',async function render(m){
+ const L=await loadLedger();if(ledgerGate(m,L))return;
+ const tb=TP.trialBalance(L.accts,L.lines,asOf),rows=tb.rows.filter(r=>showZero||r.debit||r.credit||r.movementDr||r.movementCr),T={asset:'Assets',liability:'Liabilities',equity:'Equity',income:'Income',expense:'Expenses'};
+ m.innerHTML=`<form id=f class="card noprint" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end"><label>As on<input type=date name=d value="${esc(asOf)}" max="${today()}" required></label><label style="display:flex;flex-direction:row;gap:6px;align-items:center"><input type=checkbox id=z ${showZero?'checked':''}> Show accounts with no balance</label><button>Show</button><button type=button class=g id=pr>Print</button><button type=button class=g id=csv>Export CSV</button></form>
+ <div class="card" role=${tb.balanced?'status':'alert'} style="border-left:4px solid ${tb.balanced?'#16a34a':'#dc2626'}"><b>${tb.balanced?'Books balance':'Books do NOT balance'}</b> as on ${asOf}: total debit ${inr2(tb.totalDebit)}, total credit ${inr2(tb.totalCredit)}${tb.balanced?'':', difference '+inr2(tb.difference)}.</div>
+ <div class=card><table><caption class=sr>Trial balance as on ${asOf}</caption><thead><tr><th scope=col>Code<th scope=col>Account<th scope=col>Type<th scope=col class=r>Debit<th scope=col class=r>Credit</tr></thead><tbody>
+ ${rows.map(r=>`<tr><td>${esc(r.code)}<th scope=row><a href="ledger.html?acc=${r.id}&to=${asOf}">${esc(r.name)}</a>${r.active?'':' <span class=k>(inactive)</span>'}</th><td>${T[r.type]}<td class=r>${r.debit?inr2(r.debit):''}<td class=r>${r.credit?inr2(r.credit):''}</tr>`).join('')||'<tr><td colspan=5>No entries yet.</tr>'}
+ </tbody><tfoot><tr><th scope=row colspan=3>Total</th><td class=r><b>${inr2(tb.totalDebit)}</b><td class=r><b>${inr2(tb.totalCredit)}</b></tr></tfoot></table></div>`;
+ $('#f').onsubmit=e=>{e.preventDefault();asOf=new FormData($('#f')).get('d')||today();showZero=$('#z').checked;render(m)};
+ $('#pr').onclick=()=>window.print();
+ $('#csv').onclick=()=>TP.download('trial-balance-'+asOf+'.csv',[['Code','Account','Type','Debit','Credit'],...rows.map(r=>[r.code,r.name,T[r.type],r.debit||'',r.credit||'']),['','Total','',tb.totalDebit,tb.totalCredit]]);
+},'trial-balance.html');
+</script></body></html>

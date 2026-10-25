@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+boot('Journal Entry',async function render(m){
+ const L=await loadLedger();if(ledgerGate(m,L))return;
+ const acc=L.accts.filter(a=>a.is_active&&a.system_key!=='receivables'&&a.system_key!=='payables').sort((a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true})),N=4;
+ const row=k=>`<tr data-r><td><label class=sr for="a${k}">Account, line ${k+1}</label><select id="a${k}" data-f=account_id><option value="">Choose account…</option>${acc.map(a=>`<option value="${a.id}">${esc(a.code+' '+a.name)}</option>`).join('')}</select><td><label class=sr for="d${k}">Debit, line ${k+1}</label><input id="d${k}" data-f=debit type=number min=0 step=0.01 inputmode=decimal class=r placeholder="Debit"><td><label class=sr for="c${k}">Credit, line ${k+1}</label><input id="c${k}" data-f=credit type=number min=0 step=0.01 inputmode=decimal class=r placeholder="Credit"><td><label class=sr for="m${k}">Memo, line ${k+1}</label><input id="m${k}" data-f=memo placeholder="Memo (optional)"></tr>`;
+ m.innerHTML=`<form id=f class=card novalidate><h3>New manual journal</h3><p class=k>Use this for adjustments that are not an invoice or payment (bank charges, owner capital, depreciation, corrections). Debits must equal credits. Debtors and creditors are changed only through invoices and payments. A posted journal can be reversed but never edited.</p>
+  <div class=g2><label>Date<input type=date name=date value="${today()}" required></label><label>Narration<input name=narration maxlength=200 placeholder="What is this entry for?" required></label></div>
+  <table class=jt style="margin-top:10px"><caption class=sr>Journal lines</caption><thead><tr><th scope=col>Account<th scope=col class=r>Debit (₹)<th scope=col class=r>Credit (₹)<th scope=col>Memo</tr></thead><tbody id=rows>${Array.from({length:N},(_,k)=>row(k)).join('')}</tbody></table>
+  <div class="f2" style="margin:10px 0;flex-wrap:wrap"><button type=button class=g id=add>+ Add line</button><span id=tot role=status aria-live=polite class=k style="align-self:center"></span></div>
+  <p id=err class=dn role=alert></p><div class=f2><button id=save>Post journal</button><a class=btn style="background:#eef1fb;color:#14213d" href="daybook.html">Cancel</a></div></form>`;
+ const f=$('#f'),lines=()=>[...f.querySelectorAll('[data-r]')].map(r=>Object.fromEntries([...r.querySelectorAll('[data-f]')].map(x=>[x.dataset.f,x.value])));
+ const tot=()=>{const v=TP.validateJournal(lines());$('#tot').innerHTML=`Debit <b>${inr2(v.debit)}</b> · Credit <b>${inr2(v.credit)}</b> · ${v.diff===0&&v.debit>0?'<span class=up>Balanced</span>':'<span class=dn>Difference '+inr2(Math.abs(v.diff))+'</span>'}`;return v};
+ f.oninput=()=>{$('#err').textContent='';tot()};tot();
+ let n=N;$('#add').onclick=()=>{$('#rows').insertAdjacentHTML('beforeend',row(n++));tot()};
+ f.onsubmit=e=>{e.preventDefault();return guard(f,async()=>{const d=new FormData(f),v=TP.validateJournal(lines());
+  if(!v.ok){$('#err').textContent=v.errors[0];return}
+  if(await lockedBlock(d.get('date')))return;
+  const ls=lines().filter(l=>l.account_id||+l.debit||+l.credit).map(l=>({account_id:l.account_id,debit:+l.debit||0,credit:+l.credit||0,memo:l.memo||null}));
+  const r=await db.rpc('post_manual_journal',{p_date:d.get('date'),p_narration:d.get('narration'),p_lines:ls});
+  if(r.error){$('#err').textContent=r.error.message;return}
+  toast('Journal posted');location.href='daybook.html?from='+d.get('date')+'&to='+d.get('date')})};
+},'journal-new.html');
+</script></body></html>
