@@ -1,7 +1,7 @@
 /* Toolkit Pro - reporting helpers (pure functions: no DOM, no database). Used by ageing / statement / daily pages and by tests/phase1.test.js.
    Money is handled as integer paise internally and returned in rupees rounded to 2 decimals. */
 const TP=(()=>{
- const paise=n=>{n=+n||0;return Math.round(n*100+(n<0?-1e-9:1e-9))},rup=p=>p/100;
+ const paise=n=>{n=+n||0;return Math.round(n*100+(n<0?-1e-9:1e-9))},rup=p=>p/100+0;
  const dnum=s=>{const[y,m,d]=String(s).slice(0,10).split('-').map(Number);return Date.UTC(y,m-1,d)/864e5};
  const diff=(a,b)=>Math.round(dnum(a)-dnum(b)),addDays=(s,n)=>new Date((dnum(s)+n)*864e5).toISOString().slice(0,10);
  const BUCKETS=[['cur','Not yet due'],['b1','1-30 days'],['b2','31-60 days'],['b3','61-90 days'],['b4','Over 90 days']];
@@ -66,6 +66,73 @@ const TP=(()=>{
  const csv=rows=>rows.map(r=>r.map(cell).join(',')).join('\r\n');
  function download(name,rows){if(typeof document==='undefined')return;const b=new Blob(['﻿'+csv(rows)],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
  const fyStart=d=>{const y=+d.slice(0,4),m=+d.slice(5,7);return(m>=4?y:y-1)+'-04-01'};
- return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart};
+
+ /* ---------------- Ledger reports (Phase 2). lines = journal lines joined with their journal: {gl_account_id, debit, credit, entry_date, journal_no, party_id} ---------------- */
+ const DR_TYPES={asset:1,expense:1},natural=(type,d,c)=>DR_TYPES[type]?d-c:c-d,side=(bal,type)=>bal===0?'':((bal>0)===!!DR_TYPES[type]?'Dr':'Cr');
+ const codeCmp=(a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true});
+ const jno=n=>'JV-'+String(n).padStart(6,'0');
+
+ function trialBalance(accts,lines,asOf){
+  const m=new Map((accts||[]).map(a=>[a.id,{a,d:0,c:0}]));
+  for(const l of lines||[]){if(asOf&&l.entry_date>asOf)continue;const r=m.get(l.gl_account_id);if(!r)continue;r.d+=paise(l.debit);r.c+=paise(l.credit)}
+  let td=0,tc=0;
+  const rows=[...m.values()].sort((x,y)=>codeCmp(x.a,y.a)).map(({a,d,c})=>{const net=d-c,dr=net>0?net:0,cr=net<0?-net:0;td+=dr;tc+=cr;
+   return{id:a.id,code:a.code,name:a.name,type:a.type,active:a.is_active!==false,debit:rup(dr),credit:rup(cr),movementDr:rup(d),movementCr:rup(c)}});
+  return{rows,totalDebit:rup(td),totalCredit:rup(tc),balanced:td===tc,difference:rup(td-tc),asOf:asOf||null};
+ }
+
+ function generalLedger(acct,lines,from,to){
+  const mine=(lines||[]).filter(l=>l.gl_account_id===acct.id).sort((x,y)=>x.entry_date<y.entry_date?-1:x.entry_date>y.entry_date?1:(x.journal_no-y.journal_no)||String(x.id).localeCompare(String(y.id)));
+  let open=0,bal=0,td=0,tc=0;const rows=[];
+  for(const l of mine){const d=paise(l.debit),c=paise(l.credit),n=natural(acct.type,d,c);
+   if(from&&l.entry_date<from){open+=n;bal=open;continue}
+   if(to&&l.entry_date>to)continue;
+   bal+=n;td+=d;tc+=c;rows.push({date:l.entry_date,journalNo:l.journal_no,journalId:l.journal_id,narration:l.narration||'',kind:l.kind||'',sourceTable:l.source_table||null,sourceId:l.source_id||null,memo:l.memo||'',debit:rup(d),credit:rup(c),balance:rup(bal),side:side(bal,acct.type)})}
+  return{opening:rup(open),openingSide:side(open,acct.type),rows,totalDebit:rup(td),totalCredit:rup(tc),closing:rup(bal),closingSide:side(bal,acct.type)};
+ }
+
+ function dayBook(journals,lines,accts,from,to){
+  const am=new Map((accts||[]).map(a=>[a.id,a])),by=new Map();
+  for(const l of lines||[]){if(!by.has(l.journal_id))by.set(l.journal_id,[]);by.get(l.journal_id).push(l)}
+  return(journals||[]).filter(j=>(!from||j.entry_date>=from)&&(!to||j.entry_date<=to))
+   .sort((x,y)=>x.entry_date<y.entry_date?-1:x.entry_date>y.entry_date?1:x.journal_no-y.journal_no)
+   .map(j=>{const ls=(by.get(j.id)||[]).map(l=>({code:am.get(l.gl_account_id)?.code||'',name:am.get(l.gl_account_id)?.name||'(unknown account)',debit:rup(paise(l.debit)),credit:rup(paise(l.credit)),memo:l.memo||''}));
+    return{...j,label:jno(j.journal_no),lines:ls,total:rup(ls.reduce((s,l)=>s+paise(l.debit),0))}});
+ }
+
+ /* Client-side check before posting a manual journal (the database re-checks everything). */
+ function validateJournal(lines){
+  const errors=[];let d=0,c=0,n=0;
+  for(const [i,l] of (lines||[]).entries()){const dr=paise(l.debit),cr=paise(l.credit);if(!l.account_id&&!dr&&!cr)continue;n++;
+   if(!l.account_id)errors.push('Line '+(i+1)+': choose an account');
+   if(dr<0||cr<0)errors.push('Line '+(i+1)+': amounts cannot be negative');
+   if(dr>0&&cr>0)errors.push('Line '+(i+1)+': use either debit or credit, not both');
+   if(!dr&&!cr)errors.push('Line '+(i+1)+': enter an amount');
+   d+=dr;c+=cr}
+  if(n<2)errors.push('Add at least two lines');
+  if(d!==c)errors.push('Debit and credit must be equal');
+  return{ok:!errors.length,debit:rup(d),credit:rup(c),diff:rup(d-c),errors};
+ }
+
+ /* Ledger vs sub-ledgers. Differences point at data to review (manual journals, unsynced rows, or paid amounts that disagree with linked payments). */
+ function reconcile({lines,accts,invoices,txns,bankAccounts}){
+  const sys=new Map((accts||[]).filter(a=>a.system_key).map(a=>[a.system_key,a])),ids=k=>sys.get(k)?.id;
+  const net=(pred)=>(lines||[]).filter(pred).reduce((s,l)=>s+paise(l.debit)-paise(l.credit),0);
+  const out=(kind)=>(invoices||[]).filter(x=>x.kind===kind).reduce((s,x)=>s+paise(x.amount)-paise(x.paid),0);
+  const mk=(name,l,b)=>({name,ledger:rup(l),books:rup(b),diff:rup(l-b),ok:l===b});
+  const rec=mk('Debtors (accounts receivable) vs unpaid sales invoices',net(l=>l.gl_account_id===ids('receivables')),out('sale'));
+  const pay=mk('Creditors (accounts payable) vs unpaid bills',-net(l=>l.gl_account_id===ids('payables')),out('purchase'));
+  const banks=(bankAccounts||[]).map(b=>{const g=(accts||[]).find(a=>a.bank_account_id===b.id),t=(txns||[]).filter(x=>x.account_id===b.id);
+   const books=paise(b.opening)+t.reduce((s,x)=>s+(x.type==='income'?1:-1)*paise(x.amount),0);return mk('Bank: '+b.name,g?net(l=>l.gl_account_id===g.id):0,books)});
+  const t0=(txns||[]).filter(x=>!x.account_id),cash=mk('Cash in hand (entries with no bank account)',net(l=>l.gl_account_id===ids('cash')),t0.reduce((s,x)=>s+(x.type==='income'?1:-1)*paise(x.amount),0));
+  const tb=trialBalance(accts,lines);
+  // per-party receivable/payable differences
+  const parties=[];for(const [key,kind,sign] of [['receivables','sale',1],['payables','purchase',-1]]){const g=ids(key),led=new Map(),sub=new Map();
+   for(const l of lines||[]){if(l.gl_account_id!==g||!l.party_id)continue;led.set(l.party_id,(led.get(l.party_id)||0)+sign*(paise(l.debit)-paise(l.credit)))}
+   for(const x of invoices||[]){if(x.kind!==kind)continue;sub.set(x.party_id,(sub.get(x.party_id)||0)+paise(x.amount)-paise(x.paid))}
+   for(const id of new Set([...led.keys(),...sub.keys()])){const a=led.get(id)||0,b=sub.get(id)||0;if(a!==b)parties.push({party_id:id,kind,ledger:rup(a),books:rup(b),diff:rup(a-b)})}}
+  return{checks:[rec,pay,...banks,cash],trialBalanceBalanced:tb.balanced,partyDifferences:parties,allOk:tb.balanced&&[rec,pay,...banks,cash].every(c=>c.ok)&&!parties.length};
+ }
+ return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile};
 })();
 if(typeof module!=='undefined')module.exports=TP;

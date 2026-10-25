@@ -6,9 +6,9 @@ const inr=n=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0}
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 /* Money: amounts are INR, held as integer paise for arithmetic, rounded half-up to 2 decimals, stored as numeric(.,2). */
-const paise=n=>Math.round((+n||0)*100+(n<0?-1e-9:1e-9)),rup=p=>p/100;
+const paise=n=>Math.round((+n||0)*100+(n<0?-1e-9:1e-9)),rup=p=>p/100+0;
 const RATES=[0,5,12,18,28];
-const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['',[['settings.html','Settings']]]];
+const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['Books',[['trial-balance.html','Trial Balance'],['ledger.html','General Ledger'],['ledger.html?book=cash','Cash Book'],['daybook.html','Day Book'],['journal-new.html','Journal Entry'],['coa.html','Chart of Accounts'],['ledger-setup.html','Ledger Setup']]],['',[['settings.html','Settings']]]];
 const Q=new URLSearchParams(location.search);
 const inr2=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const stat=x=>{const o=paise(x.amount)-paise(x.paid);if(o<=0)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return+x.paid>0?['Partially paid','pp']:['Unpaid','du']};
@@ -17,7 +17,9 @@ async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices 
  const incl=confirm('Do the existing amounts already include GST?\nOK = included (total stays the same)\nCancel = GST is extra (total increases)');
  for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?rup(paise(a)-paise(tv)):rup(paise(g.cgst)+paise(g.sgst)+paise(g.igst)),hp=Math.floor(paise(tax)/2),c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:rup(hp),sgst:rup(paise(tax)-hp),igst:0};
   if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:rup(paise(tv)+paise(tax))}).eq('id',x.id))))return false}toast('GST updated');return true}
-let LP=null;const load0=async()=>{const q=n=>db.from(n).select('*').then(r=>{if(r.error)throw r.error;return r.data||[]});const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
+/* Supabase returns at most 1000 rows per request. Below that nothing changes; at 1000 rows we re-read every page in a stable order so nothing is silently cut off. */
+const fetchAll=async mk=>{const f=await mk();if(f.error)throw f.error;const d=f.data||[];if(d.length<1000)return d;let out=[];for(let o=0;;o+=1000){const r=await mk().order('id').range(o,o+999);if(r.error)throw r.error;out=out.concat(r.data||[]);if((r.data||[]).length<1000)break}return out};
+let LP=null;const load0=async()=>{const q=n=>fetchAll(()=>db.from(n).select('*'));const[t,a,p,i,r,h,s,b,g,d]=await Promise.all(['transactions','accounts','parties','invoices','reminders','assets','settings','budgets','goals','documents'].map(q));return{t,a,p,i,r,h,S:s[0]||{},b,g,d}};
 const load=()=>LP||load0();
 const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+paise(x.amount),0)/100;
 const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:rup(paise(x.opening)+paise(sum(l,'income'))-paise(sum(l,'expense')))}});
@@ -34,6 +36,21 @@ const toast=m=>{const d=document.createElement('div');d.className='toast';d.setA
 const guard=async(f,fn)=>{if(!f||f.dataset.busy)return;f.dataset.busy=1;f.setAttribute('aria-busy','true');const bs=[...f.querySelectorAll('button')],pv=bs.map(b=>b.disabled);bs.forEach(b=>b.disabled=true);try{return await fn()}finally{delete f.dataset.busy;f.removeAttribute('aria-busy');bs.forEach((b,i)=>b.disabled=pv[i])}};
 /* True when a Supabase RPC has not been installed yet (migrations not run): callers fall back to the older client-side flow. */
 const noFn=e=>!!e&&(e.code==='PGRST202'||e.code==='42883'||/could not find the function|schema cache/i.test(e.message||''));
+/* ---- Ledger helpers (Phase 2). Everything degrades gracefully when the ledger tables are not installed. ---- */
+const noTable=e=>!!e&&(e.code==='42P01'||e.code==='PGRST205'||/does not exist|schema cache|could not find the table/i.test(e.message||''));
+const loadLedger=async()=>{const s=await db.from('ledger_settings').select('*').limit(1);
+ if(s.error){if(noTable(s.error))return{missing:true};throw s.error}
+ const st=(s.data||[])[0]||null;if(!st||!st.posting_enabled)return{missing:false,ready:false,settings:st};
+ const[accts,journals,lines]=await Promise.all([fetchAll(()=>db.from('gl_accounts').select('*')),fetchAll(()=>db.from('journals').select('*')),fetchAll(()=>db.from('journal_lines').select('*'))]);
+ const jm=new Map(journals.map(j=>[j.id,j]));
+ return{missing:false,ready:true,settings:st,accts,journals,lines:lines.map(l=>{const j=jm.get(l.journal_id)||{};return{...l,entry_date:j.entry_date,journal_no:j.journal_no,narration:j.narration,kind:j.kind,source_table:j.source_table,source_id:j.source_id}})}};
+const ledgerGate=(m,L)=>{if(L.missing){m.innerHTML='<div class=card role=status><h3>Ledger not installed yet</h3><p>The ledger tables have not been added to your database. Run <b>010_ledger_core.sql</b>, <b>011_ledger_posting.sql</b> and <b>012_ledger_functions.sql</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor, then reload. Everything else keeps working without it.</p></div>';return true}
+ if(!L.ready){m.innerHTML='<div class=card role=status><h3>Ledger not set up yet</h3><p>Your books have not been switched on. Nothing has been changed in your existing data.</p><a class=btn href="ledger-setup.html">Go to Ledger Setup</a></div>';return true}return false};
+const jsrc=(t,id,inv)=>t==='invoices'?'invoice.html?id='+id+'&kind='+((inv||[]).find(x=>x.id===id)?.kind||'sale'):t==='transactions'?'transactions.html':t==='accounts'?'banking.html':'';
+/* Period lock pre-check for multi-step edits (the database enforces it too; this avoids half-finished two-step saves). */
+const lockedBlock=async(...ds)=>{try{const r=await db.from('ledger_settings').select('locked_through,posting_enabled').limit(1),s=r.error?null:(r.data||[])[0];
+ if(!s||!s.posting_enabled||!s.locked_through)return false;const b=ds.filter(Boolean).map(String).find(d=>d<=s.locked_through);
+ if(b){alert('The date '+b+' is in a locked period (up to '+s.locked_through+'). Ask the owner to unlock it in Ledger Setup, or use a later date.');return true}return false}catch(_){return false}};
 const mail=async(to,s,b)=>{if(!to){alert('Add an email address for this contact first.');return}
  const{error}=await db.functions.invoke('send-mail',{body:{to,subject:s,body:b}});
  if(error){alert('Server mail failed: '+error.message+'. Opening your email app instead.');location.href=`mailto:${to}?subject=${encodeURIComponent(s)}&body=${encodeURIComponent(b)}`}else toast('Email sent to '+to)};

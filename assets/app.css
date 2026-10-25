@@ -181,3 +181,7 @@ caption.sr{position:absolute}
 @media print{.card{box-shadow:none;border:1px solid #ddd;break-inside:avoid}a{color:inherit}main{padding:0}}
 @media(max-width:560px){.row.rep{grid-template-columns:repeat(2,minmax(0,1fr))}.row.rep .v{font-size:17px}}
 .rpt td:first-child{white-space:nowrap}
+/* ---- Phase 2 (books) ---- */
+.v small{font-size:12px;font-weight:600;color:var(--tp-mut)}
+#rows select,#rows input{width:100%}#rows td{vertical-align:top}
+@media(max-width:560px){#rows td{display:block;padding:2px 0;border:0}#rows tr{display:block;padding:8px 0;border-bottom:1px solid #eef0f6}.jt thead{display:none}}
