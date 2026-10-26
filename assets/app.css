@@ -185,3 +185,16 @@ caption.sr{position:absolute}
 .v small{font-size:12px;font-weight:600;color:var(--tp-mut)}
 #rows select,#rows input{width:100%}#rows td{vertical-align:top}
 @media(max-width:560px){#rows td{display:block;padding:2px 0;border:0}#rows tr{display:block;padding:8px 0;border-bottom:1px solid #eef0f6}.jt thead{display:none}}
+
+/* ---- Standard sizing on every screen (laptop, desktop, tablet, phone, browser zoom) ---- */
+html{font-size:100%}
+body{font-size:clamp(13px,calc(12px + .12vw),14.5px)}
+aside{width:clamp(200px,15vw,236px)}
+main{padding:clamp(12px,1.2vw,20px) clamp(12px,1.5vw,24px)}
+header{padding:clamp(10px,1vw,14px) clamp(12px,1.5vw,24px)}
+h1{font-size:clamp(17px,1.2vw + 8px,20px)}
+.v{font-size:clamp(19px,.5vw + 14px,24px)}
+@media(max-width:900px){input,select,textarea{font-size:16px}button,.btn{font-size:15px}}
+@media(min-width:2200px){body{max-width:2000px}}
+.f2{flex-wrap:wrap}
+.card{position:relative}

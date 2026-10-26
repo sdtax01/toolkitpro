@@ -37,3 +37,12 @@ Then open **Books > Ledger Setup** and press *Set up ledger*. It builds the char
 - Period lock stops adding, editing or deleting anything dated on or before the locked date.
 - Tests: `tests/sql/phase2_test.sql` (`psql -v with_p0=1 -v dump=/tmp/ledger_dump.json -f ...`), `node tests/phase2.test.js /tmp/ledger_dump.json`.
 - Known limits: manual journals cannot touch Debtors/Creditors (use invoices and payments); invoices without a GST breakup post their whole amount to Sales; ledger text for a renamed party updates only when that party's invoices are next edited.
+
+## Phase 3: Profit & Loss, Balance Sheet, Year-end review, Bank reconciliation
+
+Run once in the Supabase SQL Editor (after Phases 0 to 2): `supabase/migrations/013_bank_reconciliation.sql`. Undo: `supabase/undo/013_bank_reconciliation_down.sql` (removes imported statement lines and saved reconciliations only).
+
+- **Profit & Loss** (`profit-loss.html`), **Balance Sheet** (`balance-sheet.html`) and **Year-end Review** (`year-end.html`) read the ledger. They need no new SQL; they appear under Books.
+- **Bank Reconciliation** (`bank-rec.html`) works on your Transactions. Import a bank CSV (Date, Description, Debit and Credit, or one Amount column), accept matches, record missing items, enter the statement balance, and save when the difference is zero. A bank account that has saved reconciliations cannot be deleted.
+- Layout: Quick Summary removed from the sidebar, the header "+ Add Transaction" button removed, and fonts and sidebar width now scale between phone and large desktop.
+- Tests: `node tests/phase3.test.js [ledger_dump.json]` and `tests/sql/phase3_test.sql`.

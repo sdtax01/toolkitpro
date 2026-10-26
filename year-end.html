@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+let fyStart=/^\d{4}-04-01$/.test(Q.get('fy')||'')?Q.get('fy'):TP.fyOf(today()).start;
+boot('Financial Year Review',async function render(m){
+ const L=await loadLedger();if(ledgerGate(m,L))return;
+ const fy=TP.fyOf(fyStart),y=+fy.start.slice(0,4),opts=[];for(let k=y+1;k>=y-4;k--)opts.push(k+'-04-01');
+ const p=TP.profitAndLoss(L.accts,L.lines,fy.start,fy.end),b=TP.balanceSheet(L.accts,L.lines,fy.end),tb=TP.trialBalance(L.accts,L.lines,fy.end);
+ const un=await db.rpc('ledger_unsynced'),unsynced=un.error?null:(un.data||[]).length,lk=L.settings&&L.settings.locked_through,lockOk=!!lk&&lk>=fy.end;
+ const chk=(ok,t,d)=>`<tr><td aria-hidden=true>${ok?'✅':'⚠️'}<td><b>${t}</b> <span class=k>${ok?'OK':'Needs attention'}</span><br><span class=k>${d}</span></tr>`;
+ m.innerHTML=`<form id=f class="card noprint" style="display:flex;gap:12px;align-items:end"><label>Financial year<select name=fy>${opts.map(o=>`<option value="${o}" ${o===fyStart?'selected':''}>FY ${TP.fyOf(o).label}</option>`).join('')}</select></label><button>Show</button><button type=button class=g id=pr>Print</button></form>
+ <div class="row c4"><div class=card><div class=k>Income</div><div class=v>${inr2(p.totalIncome)}</div></div><div class=card><div class=k>Expenses</div><div class=v>${inr2(p.totalExpense)}</div></div><div class=card><div class=k>Net ${p.isLoss?'loss':'profit'}</div><div class="v ${p.isLoss?'dn':'up'}">${inr2(Math.abs(p.netProfit))}</div></div><div class=card><div class=k>Closing assets</div><div class=v>${inr2(b.totalAssets)}</div></div></div>
+ <div class=card><h3>Year-end checklist, FY ${fy.label}</h3><table><tbody>
+ ${chk(tb.balanced,'Trial balance balances','Debit '+inr2(tb.totalDebit)+' vs credit '+inr2(tb.totalCredit))}
+ ${chk(b.balanced,'Balance sheet balances','Assets '+inr2(b.totalAssets)+' vs liabilities + equity '+inr2(b.totalLiabEquity))}
+ ${unsynced==null?chk(false,'Posting check unavailable','Could not read the posting status. Open Ledger Setup.'):chk(!unsynced,'All invoices and transactions are posted to the ledger',unsynced?unsynced+' item(s) not posted. Use Re-sync on the Ledger Setup page.':'Nothing waiting to be posted.')}
+ ${chk(lockOk,'Period locked to prevent late changes',lockOk?'Locked through '+lk+'.':'Lock the period on the Ledger Setup page after your CA signs off.')}
+ </tbody></table><p class=k>No closing journal is needed. The balance sheet carries each year's profit into retained earnings automatically, and nothing is deleted or reset.</p></div>
+ <div class=card><h3>Reports for this year</h3><p><a class=btn href="profit-loss.html?from=${fy.start}&to=${fy.end}">Profit &amp; Loss</a> <a class=btn href="balance-sheet.html?asof=${fy.end}">Balance Sheet</a> <a class=btn href="trial-balance.html?asof=${fy.end}">Trial Balance</a> <a class=btn href="ageing.html?kind=sale">Debtors Ageing</a> <a class=btn href="ageing.html?kind=purchase">Creditors Ageing</a></p></div>`;
+ $('#f').onsubmit=e=>{e.preventDefault();fyStart=new FormData($('#f')).get('fy');render(m)};$('#pr').onclick=()=>window.print();
+},'year-end.html');
+</script></body></html>

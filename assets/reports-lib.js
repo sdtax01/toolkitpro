@@ -133,6 +133,70 @@ const TP=(()=>{
    for(const id of new Set([...led.keys(),...sub.keys()])){const a=led.get(id)||0,b=sub.get(id)||0;if(a!==b)parties.push({party_id:id,kind,ledger:rup(a),books:rup(b),diff:rup(a-b)})}}
   return{checks:[rec,pay,...banks,cash],trialBalanceBalanced:tb.balanced,partyDifferences:parties,allOk:tb.balanced&&[rec,pay,...banks,cash].every(c=>c.ok)&&!parties.length};
  }
- return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile};
+ /* ---------------- Phase 3: P&L, Balance Sheet, bank reconciliation ---------------- */
+ const fyOf=d=>{const y=+d.slice(0,4),m=+d.slice(5,7),s=m>=4?y:y-1;return{start:s+'-04-01',end:(s+1)+'-03-31',label:s+'-'+String(s+1).slice(2)}};
+ function sumBy(accts,lines,from,to){const m=new Map((accts||[]).map(a=>[a.id,{a,d:0,c:0}]));
+  for(const l of lines||[]){if(from&&l.entry_date<from)continue;if(to&&l.entry_date>to)continue;const r=m.get(l.gl_account_id);if(!r)continue;r.d+=paise(l.debit);r.c+=paise(l.credit)}return m}
+ function profitAndLoss(accts,lines,from,to){
+  const m=sumBy(accts,lines,from,to),inc=[],exp=[];let ti=0,te=0;
+  for(const {a,d,c} of [...m.values()].sort((x,y)=>codeCmp(x.a,y.a))){
+   if(a.type==='income'){const v=c-d;if(v||d||c){inc.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});ti+=v}}
+   else if(a.type==='expense'){const v=d-c;if(v||d||c){exp.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});te+=v}}}
+  return{from:from||null,to:to||null,income:inc,expenses:exp,totalIncome:rup(ti),totalExpense:rup(te),netProfit:rup(ti-te),isLoss:ti-te<0};
+ }
+ function balanceSheet(accts,lines,asOf){
+  const fy=fyOf(asOf),all=sumBy(accts,lines,null,asOf),cur=profitAndLoss(accts,lines,fy.start,asOf);
+  const prior=profitAndLoss(accts,lines,null,addDays(fy.start,-1));
+  const grp=t=>{const out=[];let tot=0;for(const {a,d,c} of [...all.values()].sort((x,y)=>codeCmp(x.a,y.a))){if(a.type!==t)continue;const v=t==='asset'?d-c:c-d;if(v||d||c){out.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});tot+=v}}return{rows:out,total:tot}};
+  const A=grp('asset'),L=grp('liability'),E=grp('equity');
+  const pri=paise(prior.netProfit),cu=paise(cur.netProfit),eqTot=E.total+pri+cu;
+  return{asOf,fy:fy.label,assets:A.rows,liabilities:L.rows,equity:E.rows,priorProfit:prior.netProfit,currentProfit:cur.netProfit,
+   totalAssets:rup(A.total),totalLiabilities:rup(L.total),totalEquity:rup(eqTot),totalLiabEquity:rup(L.total+eqTot),balanced:A.total===L.total+eqTot,difference:rup(A.total-L.total-eqTot)};
+ }
+ /* Parse a bank statement CSV. Accepts Date, Description, (Reference), and either Debit/Credit columns or one Amount column. */
+ function splitCsv(text){const rows=[];let r=[],c='',q=false;text=String(text||'').replace(/^﻿/,'');
+  for(let i=0;i<text.length;i++){const ch=text[i];
+   if(q){if(ch==='"'){if(text[i+1]==='"'){c+='"';i++}else q=false}else c+=ch}
+   else if(ch==='"')q=true;else if(ch===','){r.push(c);c=''}else if(ch==='\n'||ch==='\r'){if(ch==='\r'&&text[i+1]==='\n')i++;r.push(c);c='';if(r.some(x=>x.trim()!==''))rows.push(r);r=[]}else c+=ch}
+  r.push(c);if(r.some(x=>x.trim()!==''))rows.push(r);return rows}
+ const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+ function parseDate(s){s=String(s||'').trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);let y,mo,d;
+  if(m){y=+m[1];mo=+m[2];d=+m[3]}else if(m=s.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2}|\d{4})$/)){d=+m[1];mo=+m[2];y=+m[3];if(y<100)y+=2000}
+  else if(m=s.match(/^(\d{1,2})[\-\/ ]([A-Za-z]{3})[A-Za-z]*[\-\/ ,]*(\d{2}|\d{4})$/)){d=+m[1];mo=MON[m[2].toLowerCase()];y=+m[3];if(y<100)y+=2000}else return null;
+  if(!mo||mo>12||d<1||d>31)return null;const dt=new Date(Date.UTC(y,mo-1,d));if(dt.getUTCMonth()!==mo-1)return null;return dt.toISOString().slice(0,10)}
+ function parseAmt(s){s=String(s==null?'':s).trim();if(!s)return 0;const dr=/dr\.?$/i.test(s.trim()),neg=/^\(.*\)$/.test(s)||dr;s=s.replace(/[₹,\s()]|rs\.?/gi,'').replace(/(dr|cr)$/i,'');const n=Number(s);if(!isFinite(n))return NaN;return neg?-Math.abs(n):n}
+ function parseStatement(text){
+  const rows=splitCsv(text),out={lines:[],errors:[]};if(rows.length<2){out.errors.push('The file has no data rows');return out}
+  const h=rows[0].map(x=>x.trim().toLowerCase()),f=re=>h.findIndex(x=>re.test(x));
+  const iD=f(/^(txn |value |transaction |posting )?date/),iDesc=f(/desc|narration|particular|remark/),iRef=f(/ref|chq|cheque|utr/),iW=f(/withdraw|debit|paid out/),iDp=f(/deposit|credit|paid in/),iA=f(/^amount/);
+  if(iD<0||(iA<0&&(iW<0||iDp<0))){out.errors.push('Could not find the columns. Needed: Date, Description and either Debit and Credit, or Amount');return out}
+  const seen=new Map();
+  rows.slice(1).forEach((r,k)=>{const ln=k+2,date=parseDate(r[iD]);if(!date){out.errors.push('Row '+ln+': unreadable date "'+(r[iD]||'')+'"');return}
+   let a;if(iA>=0&&String(r[iA]||'').trim()!==''){a=parseAmt(r[iA])}else{const w=parseAmt(r[iW]),d=parseAmt(r[iDp]);if(Number.isNaN(w)||Number.isNaN(d)){out.errors.push('Row '+ln+': unreadable amount');return}a=paise(Math.abs(d||0))-paise(Math.abs(w||0));a=a/100}
+   if(Number.isNaN(a)){out.errors.push('Row '+ln+': unreadable amount');return}a=rup(paise(a));if(a===0){out.errors.push('Row '+ln+': zero amount skipped');return}
+   const desc=(iDesc>=0?r[iDesc]:'').trim(),ref=(iRef>=0?r[iRef]:'').trim(),base=[date,a.toFixed(2),ref,desc.toLowerCase().replace(/\s+/g,' ')].join('|'),n=(seen.get(base)||0)+1;seen.set(base,n);
+   out.lines.push({stmt_date:date,description:desc,reference:ref,amount:a,dedupe_key:base+'|'+n})});
+  return out}
+ /* Suggest matches: same direction and exact amount; date within `days`. Each entry used once. Returns {pairs, unmatchedLines, unmatchedTxns}. */
+ function autoMatch(stmtLines,txns,days){days=days==null?5:days;const used=new Set(),pairs=[],dd=(a,b)=>Math.abs((Date.parse(a)-Date.parse(b))/864e5);
+  const open=(stmtLines||[]).filter(l=>!l.matched_txn_id).sort((x,y)=>x.stmt_date<y.stmt_date?-1:1);
+  for(const l of open){let best=null,bd=1e9;for(const t of txns||[]){if(used.has(t.id)||t.matched)continue;
+    if(!((l.amount>0&&t.type==='income')||(l.amount<0&&t.type==='expense'))||paise(t.amount)!==paise(Math.abs(l.amount)))continue;
+    const d=dd(l.stmt_date,t.date);if(d<=days&&d<bd){bd=d;best=t}}
+   if(best){used.add(best.id);pairs.push({lineId:l.id,txnId:best.id,dayGap:bd})}}
+  const pl=new Set(pairs.map(p=>p.lineId));
+  return{pairs,unmatchedLines:open.filter(l=>!pl.has(l.id)),unmatchedTxns:(txns||[]).filter(t=>!used.has(t.id)&&!t.matched)};}
+ /* Bank reconciliation statement as on a date. stmtBalance is what the bank says. */
+ function bankRec(acct,txns,lines,stmtBalance,asOn){
+  const tx=(txns||[]).filter(t=>t.account_id===acct.id&&t.date<=asOn),book=tx.reduce((s,t)=>s+(t.type==='income'?1:-1)*paise(t.amount),paise(acct.opening||0));
+  const ln=(lines||[]).filter(l=>l.account_id===acct.id&&l.stmt_date<=asOn),matchedIds=new Set(ln.filter(l=>l.matched_txn_id).map(l=>l.matched_txn_id));
+  const txIn=new Set(tx.map(t=>t.id)),notInBank=tx.filter(t=>!matchedIds.has(t.id)),notInBooks=ln.filter(l=>!l.matched_txn_id||!txIn.has(l.matched_txn_id));
+  const dep=notInBank.filter(t=>t.type==='income'),iss=notInBank.filter(t=>t.type==='expense');
+  const sb=paise(stmtBalance),adj=sb+dep.reduce((s,t)=>s+paise(t.amount),0)-iss.reduce((s,t)=>s+paise(t.amount),0)-notInBooks.reduce((s,l)=>s+paise(l.amount),0);
+  return{asOn,bookBalance:rup(book),statementBalance:rup(sb),depositsNotInBank:dep,paymentsNotInBank:iss,linesNotInBooks:notInBooks,
+   depositsTotal:rup(dep.reduce((s,t)=>s+paise(t.amount),0)),paymentsTotal:rup(iss.reduce((s,t)=>s+paise(t.amount),0)),notInBooksTotal:rup(notInBooks.reduce((s,l)=>s+paise(l.amount),0)),
+   adjustedBalance:rup(adj),difference:rup(adj-book),reconciled:adj===book};
+ }
+ return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile,fyOf,profitAndLoss,balanceSheet,parseStatement,autoMatch,bankRec};
 })();
 if(typeof module!=='undefined')module.exports=TP;

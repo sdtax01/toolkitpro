@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+let accId=Q.get('acc')||'',asOn=today();
+boot('Bank Reconciliation',async function render(m){
+ const a=await db.from('accounts').select('*').order('name');if(a.error)throw a.error;const accts=a.data||[];
+ if(!accts.length){m.innerHTML='<div class=card>Add a bank account first on the <a href="banking.html">Banking</a> page.</div>';return}
+ if(!accts.some(x=>x.id===accId))accId=accts[0].id;
+ const acct=accts.find(x=>x.id===accId);
+ let sl;try{sl={data:await fetchAll(()=>db.from('bank_statement_lines').select('*').eq('account_id',accId))}}catch(e){sl={error:e}}
+ if(sl.error){if(noTable(sl.error)){m.innerHTML='<div class=card role=status><h3>Bank reconciliation not installed yet</h3><p>Run <b>013_bank_reconciliation.sql</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor, then reload. Everything else keeps working without it.</p></div>';return}throw sl.error}
+ const lines=(sl.data||[]).sort((x,y)=>x.stmt_date<y.stmt_date?-1:x.stmt_date>y.stmt_date?1:0),txns=await fetchAll(()=>db.from('transactions').select('*').eq('account_id',accId));
+ const stmtBal=window._sb&&window._sb[accId]!=null?window._sb[accId]:'';
+ const open=lines.filter(l=>!l.matched_txn_id),matchedTx=new Set(lines.filter(l=>l.matched_txn_id).map(l=>l.matched_txn_id));
+ const free=txns.filter(t=>!matchedTx.has(t.id)).map(t=>({...t}));
+ const sug=TP.autoMatch(lines,free,5),tmap=new Map(txns.map(t=>[t.id,t])),lmap=new Map(lines.map(l=>[l.id,l]));
+ const br=stmtBal===''||isNaN(+stmtBal)?null:TP.bankRec(acct,txns,lines,+stmtBal,asOn);
+ const list=(rows,fn)=>rows.length?`<table><tbody>${rows.map(fn).join('')}</tbody></table>`:'<p class=k>None</p>';
+ m.innerHTML=`<form id=sf class="card noprint" style="display:flex;flex-wrap:wrap;gap:12px;align-items:end"><label>Bank account<select id=ac>${accts.map(x=>`<option value="${x.id}" ${x.id===accId?'selected':''}>${esc(x.name)}</option>`).join('')}</select></label><label>As on<input type=date id=on value="${esc(asOn)}"></label><label>Balance per bank statement (₹)<input id=sb type=number step=0.01 value="${esc(stmtBal)}"></label><button>Reconcile</button></form>
+ <div class="card noprint"><h3>1. Import bank statement (CSV)</h3><p class=k>Columns needed: Date, Description, and either Debit and Credit, or Amount (money out as negative). Rows already imported are skipped, so it is safe to import the same file twice.</p><input type=file id=file accept=".csv,text/csv"> <button type=button id=imp class=g>Import</button><div id=impmsg role=status class=k></div></div>
+ <div class=card><h3>2. Match</h3>${sug.pairs.length?`<p>${sug.pairs.length} suggested match(es) (same amount and direction, within 5 days).</p><table><thead><tr><th scope=col>Bank line<th scope=col>Your entry<th scope=col class=r>Amount</tr></thead><tbody>${sug.pairs.map(p=>{const l=lmap.get(p.lineId),t=tmap.get(p.txnId);return`<tr><td>${esc(l.stmt_date)} ${esc(l.description||'')}<td>${esc(t.date)} ${esc(t.description||'')}<td class=r>${inr2(l.amount)}</tr>`}).join('')}</tbody></table><p><button id=am>Accept all suggested matches</button></p>`:'<p class=k>No new suggestions.</p>'}
+ <h4>Bank lines not matched (${open.length})</h4>${list(open,l=>`<tr><td>${esc(l.stmt_date)}<td>${esc(l.description||'')}<td class=r>${inr2(l.amount)}<td class=noprint><button class=g data-add="${l.id}">Record as entry</button> <button class=x data-del="${l.id}">Remove</button></tr>`)}
+ <h4>Matched (${lines.length-open.length})</h4>${list(lines.filter(l=>l.matched_txn_id).slice(-20),l=>`<tr><td>${esc(l.stmt_date)}<td>${esc(l.description||'')}<td class=r>${inr2(l.amount)}<td class=noprint><button class=g data-un="${l.id}">Unmatch</button></tr>`)}</div>
+ ${br?`<div class=card role=${br.reconciled?'status':'alert'} style="border-left:4px solid ${br.reconciled?'#16a34a':'#dc2626'}"><h3>3. Reconciliation as on ${esc(asOn)}</h3><table><tbody>
+ <tr><td>Balance per bank statement<td class=r>${inr2(br.statementBalance)}</tr><tr><td>Add: deposits in your books not yet in the bank (${br.depositsNotInBank.length})<td class=r>${inr2(br.depositsTotal)}</tr><tr><td>Less: payments in your books not yet cleared (${br.paymentsNotInBank.length})<td class=r>${inr2(br.paymentsTotal)}</tr><tr><td>Less: net bank items not yet in your books (${br.linesNotInBooks.length})<td class=r>${inr2(br.notInBooksTotal)}</tr>
+ <tr><td><b>Adjusted bank balance</b><td class=r><b>${inr2(br.adjustedBalance)}</b></tr><tr><td><b>Balance per your books</b><td class=r><b>${inr2(br.bookBalance)}</b></tr><tr><td><b>Difference</b><td class=r><b>${inr2(br.difference)}</b></tr></tbody></table>
+ <p>${br.reconciled?'Reconciled. Your books agree with the bank.':'Not reconciled yet. Match the remaining lines, or record the missing entries (bank charges, interest), then try again.'}</p>
+ <p class=noprint><input id=note placeholder="Note (optional)"> <button id=save ${br.reconciled?'':'disabled'}>Save this reconciliation</button> <button type=button class=g id=pr>Print</button></p></div>`:'<div class=card role=status>Enter the balance per your bank statement above to see the reconciliation.</div>'}`;
+ const rerender=()=>render(m);
+ $('#sf').onsubmit=e=>{e.preventDefault();accId=$('#ac').value;asOn=$('#on').value||today();window._sb=window._sb||{};window._sb[accId]=$('#sb').value;rerender()};
+ $('#ac').onchange=()=>{accId=$('#ac').value;rerender()};
+ $('#imp').onclick=()=>{const f=$('#file').files[0];if(!f)return alert('Choose a CSV file first.');const rd=new FileReader();rd.onload=()=>guard($('#sf'),async()=>{
+   const r=TP.parseStatement(rd.result);if(!r.lines.length){$('#impmsg').textContent=r.errors.slice(0,5).join('. ')||'Nothing to import';return}
+   const have=new Set(lines.map(l=>l.dedupe_key)),nw=r.lines.filter(l=>!have.has(l.dedupe_key));
+   if(nw.length){const ins=await db.from('bank_statement_lines').insert(nw.map(l=>({...l,account_id:accId})));if(ins.error)return alert(ins.error.message)}
+   alert('Imported '+nw.length+' new line(s). Skipped '+(r.lines.length-nw.length)+' already imported'+(r.errors.length?'. Could not read '+r.errors.length+' row(s): '+r.errors.slice(0,3).join('; '):'')+'.');rerender()});rd.readAsText(f)};
+ if($('#am'))$('#am').onclick=()=>guard($('#sf'),async()=>{let bad=0;for(const p of sug.pairs){const u=await db.from('bank_statement_lines').update({matched_txn_id:p.txnId}).eq('id',p.lineId);if(u.error)bad++}if(bad)alert(bad+' match(es) could not be saved.');rerender()});
+ m.querySelectorAll('[data-un]').forEach(b=>b.onclick=async()=>{if(await ok(db.from('bank_statement_lines').update({matched_txn_id:null}).eq('id',b.dataset.un)))rerender()});
+ m.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this imported line? Your own entries are not affected.'))return;if(await ok(db.from('bank_statement_lines').delete().eq('id',b.dataset.del)))rerender()});
+ m.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>guard($('#sf'),async()=>{const l=lmap.get(b.dataset.add);if(await lockedBlock(l.stmt_date))return;
+   const cat=l.amount>0?'Bank receipts':'Bank charges',ins=await db.from('transactions').insert({date:l.stmt_date,description:l.description||'Bank entry',category:cat,type:l.amount>0?'income':'expense',amount:Math.abs(l.amount),account_id:accId}).select().single();
+   if(ins.error)return alert(ins.error.message);const u=await db.from('bank_statement_lines').update({matched_txn_id:ins.data.id}).eq('id',l.id);
+   if(u.error){await db.from('transactions').delete().eq('id',ins.data.id);return alert(u.error.message)}rerender()}));
+ if($('#save'))$('#save').onclick=()=>guard($('#sf'),async()=>{if(await ok(db.from('bank_reconciliations').insert({account_id:accId,as_on:asOn,statement_balance:br.statementBalance,book_balance:br.bookBalance,difference:br.difference,note:$('#note').value||null})))toast('Reconciliation saved')});
+ if($('#pr'))$('#pr').onclick=()=>window.print();
+},'bank-rec.html');
+</script></body></html>
