@@ -46,3 +46,12 @@ Run once in the Supabase SQL Editor (after Phases 0 to 2): `supabase/migrations/
 - **Bank Reconciliation** (`bank-rec.html`) works on your Transactions. Import a bank CSV (Date, Description, Debit and Credit, or one Amount column), accept matches, record missing items, enter the statement balance, and save when the difference is zero. A bank account that has saved reconciliations cannot be deleted.
 - Layout: Quick Summary removed from the sidebar, the header "+ Add Transaction" button removed, and fonts and sidebar width now scale between phone and large desktop.
 - Tests: `node tests/phase3.test.js [ledger_dump.json]` and `tests/sql/phase3_test.sql`.
+
+## Heads and sub-ledgers (Chart of Accounts)
+
+Run once in the Supabase SQL Editor (after 010-012): `supabase/migrations/014_heads_subledgers.sql`. Undo: `supabase/undo/014_heads_subledgers_down.sql`.
+
+- **Chart of Accounts:** every account (except Debtors, Creditors and bank accounts) has an "Add sub-account" button. The code is picked automatically (or type your own). Sub-accounts show indented under their head, and the parent row also shows its total with sub-accounts.
+- **Invoices and bills:** a new "Income head" (sales) or "Expense head" (purchases) selector appears on the new and edit forms once at least one extra income/expense account exists. Leaving it on "(default)" posts to Sales / Purchases exactly as before. The chosen head is posted in the ledger, so it flows into the Trial Balance, Profit & Loss and Balance Sheet, which show names such as "Sales › Software sales". Changing the head later posts a reversal and a fresh entry, nothing is overwritten.
+- **Dashboard:** the Income vs Expenses chart is now on an accrual basis (sales invoices and purchase bills by invoice date, excluding GST). The cards above it are unchanged.
+- Tests: `tests/sql/heads_test.sql`.

@@ -44,6 +44,14 @@ const loadLedger=async()=>{const s=await db.from('ledger_settings').select('*').
  const[accts,journals,lines]=await Promise.all([fetchAll(()=>db.from('gl_accounts').select('*')),fetchAll(()=>db.from('journals').select('*')),fetchAll(()=>db.from('journal_lines').select('*'))]);
  const jm=new Map(journals.map(j=>[j.id,j]));
  return{missing:false,ready:true,settings:st,accts,journals,lines:lines.map(l=>{const j=jm.get(l.journal_id)||{};return{...l,entry_date:j.entry_date,journal_no:j.journal_no,narration:j.narration,kind:j.kind,source_table:j.source_table,source_id:j.source_id}})}};
+/* Income/Expense heads that can be chosen on an invoice or bill. {on:false} until migration 014 is installed and the ledger has accounts. */
+const loadHeads=async(kind,keep)=>{const off={on:false,heads:[],name:()=>''};try{
+ const c=await db.from('invoices').select('gl_account_id').limit(1);if(c.error)return off;
+ const g=await db.from('gl_accounts').select('*');if(g.error||!(g.data||[]).length)return off;
+ const all=g.data,ty=kind==='sale'?'income':'expense',sys=kind==='sale'?'sales':'purchases',byId=new Map(all.map(a=>[a.id,a])),
+  full=a=>{const o=[a.name];let p=a.parent_id&&byId.get(a.parent_id),n=0;while(p&&n++<10){o.unshift(p.name);p=p.parent_id&&byId.get(p.parent_id)}return o.join(' › ')},
+  heads=all.filter(a=>a.type===ty&&a.system_key!==sys&&(a.is_active||a.id===keep)).sort((a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true})).map(a=>({id:a.id,code:a.code,label:full(a)+(a.is_active?'':' (inactive)')}));
+ return{on:heads.length>0,heads,name:id=>{const a=byId.get(id);return a?full(a):''}}}catch(e){return off}};
 const ledgerGate=(m,L)=>{if(L.missing){m.innerHTML='<div class=card role=status><h3>Ledger not installed yet</h3><p>The ledger tables have not been added to your database. Run <b>010_ledger_core.sql</b>, <b>011_ledger_posting.sql</b> and <b>012_ledger_functions.sql</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor, then reload. Everything else keeps working without it.</p></div>';return true}
  if(!L.ready){m.innerHTML='<div class=card role=status><h3>Ledger not set up yet</h3><p>Your books have not been switched on. Nothing has been changed in your existing data.</p><a class=btn href="ledger-setup.html">Go to Ledger Setup</a></div>';return true}return false};
 const jsrc=(t,id,inv)=>t==='invoices'?'invoice.html?id='+id+'&kind='+((inv||[]).find(x=>x.id===id)?.kind||'sale'):t==='transactions'?'transactions.html':t==='accounts'?'banking.html':'';

@@ -13,6 +13,7 @@ drop function if exists public.tp_sync_one(text,uuid,uuid), public.tp_sync_sourc
 -- the "immutable" rules would block dropping rows, so remove them before the tables
 drop trigger if exists tp_lines_imm on public.journal_lines;
 drop trigger if exists tp_journals_imm on public.journals;
+alter table if exists public.invoices drop column if exists gl_account_id;   -- added by 014, if installed
 drop table if exists public.journal_lines;
 drop table if exists public.journals;
 drop table if exists public.gl_accounts;

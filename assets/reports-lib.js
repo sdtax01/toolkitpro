@@ -72,12 +72,14 @@ const TP=(()=>{
  const codeCmp=(a,b)=>String(a.code).localeCompare(String(b.code),undefined,{numeric:true});
  const jno=n=>'JV-'+String(n).padStart(6,'0');
 
+ /* 'Sales > Software sales' style names for sub-accounts */
+ const fullName=(a,accts)=>{const m=new Map((accts||[]).map(x=>[x.id,x]));const out=[a.name];let p=a.parent_id&&m.get(a.parent_id),n=0;while(p&&n++<10){out.unshift(p.name);p=p.parent_id&&m.get(p.parent_id)}return out.join(' › ')};
  function trialBalance(accts,lines,asOf){
   const m=new Map((accts||[]).map(a=>[a.id,{a,d:0,c:0}]));
   for(const l of lines||[]){if(asOf&&l.entry_date>asOf)continue;const r=m.get(l.gl_account_id);if(!r)continue;r.d+=paise(l.debit);r.c+=paise(l.credit)}
   let td=0,tc=0;
   const rows=[...m.values()].sort((x,y)=>codeCmp(x.a,y.a)).map(({a,d,c})=>{const net=d-c,dr=net>0?net:0,cr=net<0?-net:0;td+=dr;tc+=cr;
-   return{id:a.id,code:a.code,name:a.name,type:a.type,active:a.is_active!==false,debit:rup(dr),credit:rup(cr),movementDr:rup(d),movementCr:rup(c)}});
+   return{id:a.id,code:a.code,name:a.name,label:fullName(a,accts),parentId:a.parent_id||null,type:a.type,active:a.is_active!==false,debit:rup(dr),credit:rup(cr),movementDr:rup(d),movementCr:rup(c)}});
   return{rows,totalDebit:rup(td),totalCredit:rup(tc),balanced:td===tc,difference:rup(td-tc),asOf:asOf||null};
  }
 
@@ -140,14 +142,14 @@ const TP=(()=>{
  function profitAndLoss(accts,lines,from,to){
   const m=sumBy(accts,lines,from,to),inc=[],exp=[];let ti=0,te=0;
   for(const {a,d,c} of [...m.values()].sort((x,y)=>codeCmp(x.a,y.a))){
-   if(a.type==='income'){const v=c-d;if(v||d||c){inc.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});ti+=v}}
-   else if(a.type==='expense'){const v=d-c;if(v||d||c){exp.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});te+=v}}}
+   if(a.type==='income'){const v=c-d;if(v||d||c){inc.push({id:a.id,code:a.code,name:a.name,label:fullName(a,accts),amount:rup(v)});ti+=v}}
+   else if(a.type==='expense'){const v=d-c;if(v||d||c){exp.push({id:a.id,code:a.code,name:a.name,label:fullName(a,accts),amount:rup(v)});te+=v}}}
   return{from:from||null,to:to||null,income:inc,expenses:exp,totalIncome:rup(ti),totalExpense:rup(te),netProfit:rup(ti-te),isLoss:ti-te<0};
  }
  function balanceSheet(accts,lines,asOf){
   const fy=fyOf(asOf),all=sumBy(accts,lines,null,asOf),cur=profitAndLoss(accts,lines,fy.start,asOf);
   const prior=profitAndLoss(accts,lines,null,addDays(fy.start,-1));
-  const grp=t=>{const out=[];let tot=0;for(const {a,d,c} of [...all.values()].sort((x,y)=>codeCmp(x.a,y.a))){if(a.type!==t)continue;const v=t==='asset'?d-c:c-d;if(v||d||c){out.push({id:a.id,code:a.code,name:a.name,amount:rup(v)});tot+=v}}return{rows:out,total:tot}};
+  const grp=t=>{const out=[];let tot=0;for(const {a,d,c} of [...all.values()].sort((x,y)=>codeCmp(x.a,y.a))){if(a.type!==t)continue;const v=t==='asset'?d-c:c-d;if(v||d||c){out.push({id:a.id,code:a.code,name:a.name,label:fullName(a,accts),amount:rup(v)});tot+=v}}return{rows:out,total:tot}};
   const A=grp('asset'),L=grp('liability'),E=grp('equity');
   const pri=paise(prior.netProfit),cu=paise(cur.netProfit),eqTot=E.total+pri+cu;
   return{asOf,fy:fy.label,assets:A.rows,liabilities:L.rows,equity:E.rows,priorProfit:prior.netProfit,currentProfit:cur.netProfit,
@@ -197,6 +199,6 @@ const TP=(()=>{
    depositsTotal:rup(dep.reduce((s,t)=>s+paise(t.amount),0)),paymentsTotal:rup(iss.reduce((s,t)=>s+paise(t.amount),0)),notInBooksTotal:rup(notInBooks.reduce((s,l)=>s+paise(l.amount),0)),
    adjustedBalance:rup(adj),difference:rup(adj-book),reconciled:adj===book};
  }
- return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile,fyOf,profitAndLoss,balanceSheet,parseStatement,autoMatch,bankRec};
+ return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile,fullName,fyOf,profitAndLoss,balanceSheet,parseStatement,autoMatch,bankRec};
 })();
 if(typeof module!=='undefined')module.exports=TP;

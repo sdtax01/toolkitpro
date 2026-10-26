@@ -17,7 +17,7 @@ async function render(m){
  const card=(k,v,s,c='')=>`<div class="card"><div class=k>${k}</div><div class=v>${v}</div><div class="k ${c}">${s}</div></div>`;
  m.innerHTML=`<div><input type=month id=mo value="${mo}"></div>
  <div class="row c6">${card('Total Income',inr(inc),pct(inc,sum(pv,'income')),'up')}${card('Total Expenses',inr(exp),pct(exp,sum(pv,'expense')),'dn')}${card('Net Profit',inr(inc-exp),'This month',inc>=exp?'up':'dn')}${card('Total Receivables',inr(rec),'Due from clients')}${card('Total Payables',inr(pay),'Due to suppliers')}${card('Cash Balance',inr(cash),'In all accounts')}</div>
- <div class="row c21"><div class=card><h3>Income vs Expenses (${mo.slice(0,4)})</h3><div class="cb t"><canvas id=c1></canvas></div></div><div class=card><h3>Expense Breakdown</h3><div class=cb><canvas id=c2></canvas></div></div></div>
+ <div class="row c21"><div class=card><h3>Income vs Expenses (${mo.slice(0,4)})</h3><p class=k style="margin:-6px 0 8px">Accrual basis: sales invoices and purchase bills by invoice date, excluding GST.</p><div class="cb t"><canvas id=c1></canvas></div></div><div class=card><h3>Expense Breakdown</h3><div class=cb><canvas id=c2></canvas></div></div></div>
  <div class="row c4"><div class=card><h3>Business Portfolio</h3><div class=cb><canvas id=c3></canvas></div><p class=k>Total assets ${inr(ta)}</p></div>
  <div class=card><h3>Cash Flow Summary</h3><table class=sm><tr><td>Opening balance<td class=r>${inr(open)}</tr><tr><td>Total cash inflows<td class="r up">${inr(inc)}</tr><tr><td>Total cash outflows<td class="r dn">${inr(exp)}</tr><tr><td><b>Closing balance</b><td class=r><b>${inr(close)}</b></tr></table><p class="${inc>=exp?'up':'dn'}">Cash flow is ${inc>=exp?'positive':'negative'} this month.</p></div>
  <div class=card><h3>Top Income Sources</h3><table class=sm>${ic.map(x=>`<tr><td>${esc(x[0])}<td class=r>${inr(x[1])}</tr>`).join('')||'<tr><td>No income this month.</tr>'}</table></div>
@@ -26,7 +26,8 @@ async function render(m){
  <div class=card><h3>Account Balances</h3><table>${acc.map(x=>`<tr><td>${esc(x.name)}<td class=r>${inr(x.bal)}</tr>`).join('')||'<tr><td>No accounts yet. Add one on Banking & Accounts.</tr>'}</table></div></div>`;
  $('#mo').onchange=e=>{mo=e.target.value||mo;render(m)};
  const y=mo.slice(0,4),ks=[...Array(12)].map((_,n)=>y+'-'+String(n+1).padStart(2,'0'));
- draw('c1',{type:'bar',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Income',data:ks.map(k=>sum(t.filter(x=>x.date.startsWith(k)),'income')),backgroundColor:'#16a34a'},{label:'Expenses',data:ks.map(k=>sum(t.filter(x=>x.date.startsWith(k)),'expense')),backgroundColor:'#ef4444'}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
+ const invBase=(kind,k)=>rup(i.filter(x=>x.kind===kind&&String(x.date).startsWith(k)).reduce((s,x)=>s+paise(x.amount)-paise(x.cgst||0)-paise(x.sgst||0)-paise(x.igst||0),0));
+ draw('c1',{type:'bar',data:{labels:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Income',data:ks.map(k=>invBase('sale',k)),backgroundColor:'#16a34a'},{label:'Expenses',data:ks.map(k=>invBase('purchase',k)),backgroundColor:'#ef4444'}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
  const dn=(l)=>({type:'doughnut',data:{labels:l.map(x=>x[0]),datasets:[{data:l.map(x=>x[1]),backgroundColor:COL}]},options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}});
  draw('c2',dn(ec));draw('c3',dn(port));
 }

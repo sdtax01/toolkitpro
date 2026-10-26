@@ -41,6 +41,13 @@ eq('match straddling the cutoff still reconciles',T.bankRec({id:'b',opening:100}
 eq('Dr suffix is money out',T.parseStatement('Date,Description,Amount\n01/04/26,A,500.00 Dr\n02/04/26,B,10 Cr').lines.map(x=>x.amount),[-500,10]);
 eq('wrong stmt balance flagged',T.bankRec(acct,T2,S2,1500,'2026-05-31').reconciled,false);eq('diff',T.bankRec(acct,T2,S2,1500,'2026-05-31').difference,10);
 
+// sub-accounts: labels and reports
+const SA=[...A,{id:'sw',code:'4101',name:'Software sales',type:'income',parent_id:'sal'}];
+eq('full name of a sub-account',T.fullName(SA[7],SA),'Sales › Software sales');eq('plain name unchanged',T.fullName(SA[5],SA),'Sales');
+const SL=[...lines,L('2025-07-01','rec',200,0),L('2025-07-01','sw',0,200)];
+const spl=T.profitAndLoss(SA,SL,'2025-04-01','2026-03-31');
+eq('P&L lists the sub-account separately with its label',spl.income.map(r=>r.label+':'+r.amount),['Sales:1000','Sales › Software sales:200']);eq('P&L total includes sub-account',spl.totalIncome,1200);
+eq('balance sheet still balances with sub-accounts',T.balanceSheet(SA,SL,'2026-03-31').balanced,true);
 // real-database cross-check (optional): node tests/phase3.test.js ledger_dump.json
 if(process.argv[2]){const D=JSON.parse(require('fs').readFileSync(process.argv[2],'utf8')),lines=D.lines.map(l=>({...l,debit:+l.debit,credit:+l.credit})),dates=lines.map(l=>l.entry_date).sort(),last=dates[dates.length-1];
  const bs=T.balanceSheet(D.accts,lines,last),tb=T.trialBalance(D.accts,lines,last),pl=T.profitAndLoss(D.accts,lines,null,last);
