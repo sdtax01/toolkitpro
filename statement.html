@@ -1,7 +1,13 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script><script src="assets/reports-lib.js?v=20261027"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script><script src="assets/reports-lib.js?v=20261028"></script></head><body><script>
 const id=Q.get('id');let from=Q.get('from')??TP.fyStart(today()),to=Q.get('to')??today();
 boot('Statement of account',async function render(m){
  const{p,i,t,S}=await load(),x=p.find(y=>y.id===id);
+ if(!id){/* opened from the menu without a contact: read-only chooser, then the normal statement page */
+  const k=Q.get('kind')==='supplier'?'supplier':'client',W=k==='client'?'Customer':'Supplier',l=p.filter(y=>y.kind===k).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  $('h1').textContent=W+' Statements';
+  m.innerHTML=`<div class=card><h3>Choose a ${W.toLowerCase()}</h3>${l.length?`<input id=pq type=search placeholder="Search by name" aria-label="Search ${W.toLowerCase()}s" style="max-width:320px;margin-bottom:8px"><table><tr><th>Name<th>GSTIN<th></tr>${l.map(y=>`<tr data-n="${esc(String(y.name).toLowerCase())}"><td>${esc(y.name)}<td>${esc(y.gstin||'')}<td class=r><a href="statement.html?id=${y.id}&kind=${k}">Statement</a></tr>`).join('')}</table>`:`<p>No ${W.toLowerCase()}s yet. <a href="customers.html?kind=${k}">Add one</a>.</p>`}</div>`;
+  const q=$('#pq');if(q)q.oninput=()=>m.querySelectorAll('tr[data-n]').forEach(r=>r.hidden=!r.dataset.n.includes(q.value.trim().toLowerCase()));
+  return}
  const[nq,dq]=await Promise.all([db.from('gst_notes').select('*'),db.from('tds_entries').select('*')]),adjs=[...(nq.error?[]:nq.data||[]).map(n=>({invoice_id:n.invoice_id,date:n.date,amount:n.amount,label:n.kind==='credit'?'Credit note':'Debit note',ref:n.number})),...(dq.error?[]:dq.data||[]).map(d=>({invoice_id:d.invoice_id,date:d.date,amount:d.amount,label:'TDS',ref:d.section||''}))];
  if(!x){m.innerHTML='<div class=card>Contact not found. <a href="customers.html?kind=client">Back to customers</a></div>';return}
  const cust=x.kind==='client',sale=cust?'sale':'purchase',st=TP.statement(x,i,t,from||null,to||null,adjs),back='party.html?id='+id+'&kind='+x.kind;

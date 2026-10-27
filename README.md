@@ -9,7 +9,11 @@ Static multi-page accounting site + Supabase backend.
 4. Host the repo root on GitHub Pages (Settings > Pages > main / root). Open the site, create your login, then fill in Settings.
 5. Optional check: `cd tests && npm i jsdom && node linkage-test.js`
 
+## Navigation (sidebar)
+One nested sidebar for every page, defined in `NAV` in `assets/app.js` (styles at the end of `assets/app.css`). Groups: Sales, Purchases, Accounting, Tax & Compliance, Reports & Insights, Books of Accounts, Settings, plus a direct Dashboard link. The full menu-to-page map, the items that were left out because the feature does not exist, and the notes on shared pages are in `NAVIGATION_MAP.md`. No SQL is involved. Test: `node tests/nav.test.js`.
+
 ## Pages
+- (The sidebar now groups these differently; see `NAVIGATION_MAP.md`.)
 - Sales: `customers.html?kind=client` (list) > `party.html` (profile) > `invoices.html?kind=sale` (list with status tabs) > `invoice-new.html` (form) > `invoice.html` (detail, payments, email, print)
 - Purchases: same pages with `kind=supplier` / `kind=purchase` (Suppliers and Bills)
 - Accounting: transactions, banking, assets, budgets, goals. Compliance: taxes, documents, calendar, reminders. Insights: reports, overview, dashboard. Settings.

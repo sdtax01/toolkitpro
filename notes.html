@@ -1,12 +1,12 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script></head><body><script>
 const need=(m,n,what)=>{m.innerHTML=`<div class=card role=status><h3>${what} not installed yet</h3><p>Run <b>${n}</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor (after the earlier migrations), then reload. Everything else keeps working without it.</p></div>`};
-const pre=Q.get('invoice')||'';
+const pre=Q.get('invoice')||'',nk=['credit','debit'].includes(Q.get('kind'))?Q.get('kind'):'';
 boot('Credit / Debit Notes',async function render(m){
  const{i,p,S}=await load(),nq=await db.from('gst_notes').select('*').order('date',{ascending:false});
  if(nq.error){if(noTable(nq.error))return need(m,'018_notes_tds_itc.sql','Credit/debit notes');throw nq.error}
  const N=nq.data||[],pn=id=>(p.find(x=>x.id===id)||{}).name||'',inv=id=>i.find(x=>x.id===id)||{};
  const usable=i.filter(x=>x.amount>0).sort((a,b)=>a.date<b.date?1:-1);
- const sel=usable.find(x=>x.id===pre)||usable[0];
+ const sel=usable.find(x=>x.id===pre)||usable.find(x=>nk?x.kind===(nk==='credit'?'sale':'purchase'):true)||usable[0],shown=nk?N.filter(n=>n.kind===nk):N;
  const nextNo=k=>(k==='sale'?'CN-':'DN-')+String(N.filter(n=>n.kind===(k==='sale'?'credit':'debit')).length+1).padStart(4,'0');
  m.innerHTML=`<div class=card><h3>New note</h3><p class=k>A <b>credit note</b> reduces a sales invoice (return, discount). A <b>debit note</b> here reduces a purchase bill (goods returned to the supplier). The original document is never changed. The tax type follows the original invoice. Confirm Sec 34 conditions and time limits with your CA.</p>
  <form id=f class=g2><label class=full>Against invoice / bill<select name=invoice_id required>${usable.map(x=>`<option value="${x.id}" ${sel&&x.id===sel.id?'selected':''}>${esc(x.number)} · ${esc(pn(x.party_id))} · ${x.kind==='sale'?'sale':'purchase'} · ${inr2(x.amount)}</option>`).join('')}</select></label>
@@ -14,7 +14,7 @@ boot('Credit / Debit Notes',async function render(m){
  <label>Taxable value to reduce (₹)<input name=taxable type=number min=0.01 step=0.01 required></label><label>GST rate %<select name=rate></select></label>
  <label class=full>Reason<input name=reason required placeholder="Goods returned / rate difference / discount"></label>
  <div class=full id=sum></div><div class="f2 full"><button>Save note</button></div></form></div>
- <div class=card><h3>Notes issued</h3><table><tr><th>Date<th>Number<th>Type<th>Against<th>Party<th class=r>Taxable<th class=r>Tax<th class=r>Total<th></tr>${N.map(n=>`<tr><td>${n.date}<td>${esc(n.number)}<td>${n.kind==='credit'?'Credit note':'Debit note'}<td><a href="invoice.html?id=${n.invoice_id}&kind=${inv(n.invoice_id).kind||'sale'}">${esc(inv(n.invoice_id).number||'')}</a><td>${esc(pn(inv(n.invoice_id).party_id))}<td class=r>${inr2(n.taxable)}<td class=r>${inr2(rup(paise(n.cgst)+paise(n.sgst)+paise(n.igst)))}<td class=r>${inr2(n.amount)}<td><button class=x data-id="${n.id}">Delete</button></tr>`).join('')||'<tr><td colspan=9>No notes yet.</tr>'}</table></div>`;
+ <div class=card><h3>Notes issued</h3>${nk?`<p class=k>Showing ${nk} notes only. <a href="notes.html">Show all notes</a></p>`:''}<table><tr><th>Date<th>Number<th>Type<th>Against<th>Party<th class=r>Taxable<th class=r>Tax<th class=r>Total<th></tr>${shown.map(n=>`<tr><td>${n.date}<td>${esc(n.number)}<td>${n.kind==='credit'?'Credit note':'Debit note'}<td><a href="invoice.html?id=${n.invoice_id}&kind=${inv(n.invoice_id).kind||'sale'}">${esc(inv(n.invoice_id).number||'')}</a><td>${esc(pn(inv(n.invoice_id).party_id))}<td class=r>${inr2(n.taxable)}<td class=r>${inr2(rup(paise(n.cgst)+paise(n.sgst)+paise(n.igst)))}<td class=r>${inr2(n.amount)}<td><button class=x data-id="${n.id}">Delete</button></tr>`).join('')||'<tr><td colspan=9>No notes yet.</tr>'}</table></div>`;
  const f=$('#f'),e=f.elements,rt=()=>{const x=inv(e.invoice_id.value);return+x.gst_rate||+S.default_gst||0};
  const fillRate=()=>{const x=inv(e.invoice_id.value);e.rate.innerHTML=RATES.map(r=>`<option ${r==rt()?'selected':''}>${r}`).join('');e.number.value=e.number.value||nextNo(x.kind)};
  const calc=()=>{const x=inv(e.invoice_id.value),tv=+e.taxable.value||0,r=+e.rate.value||0,intra=(+x.cgst||0)>0||(+x.sgst||0)>0,h=Math.round(paise(tv)*r/200+1e-9),ig=Math.round(paise(tv)*r/100+1e-9);
@@ -23,7 +23,7 @@ boot('Credit / Debit Notes',async function render(m){
  e.invoice_id.onchange=()=>{e.number.value='';fillRate();upd()};fillRate();f.oninput=upd;f.onchange=upd;upd();
  f.onsubmit=ev=>{ev.preventDefault();return guard(f,async()=>{const{x,tv,g,total}=calc();if(await lockedBlock(e.date.value))return;
   const r=await db.from('gst_notes').insert({kind:x.kind==='sale'?'credit':'debit',invoice_id:x.id,number:e.number.value.trim(),date:e.date.value,taxable:tv,cgst:g.cgst,sgst:g.sgst,igst:g.igst,amount:total,reason:e.reason.value.trim()});
-  if(r.error)return alert(r.error.message);toast('Note saved');history.replaceState(null,'','notes.html');render(m)})};
+  if(r.error)return alert(r.error.message);toast('Note saved');history.replaceState(null,'','notes.html'+(nk?'?kind='+nk:''));render(m)})};
  m.querySelectorAll('.x[data-id]').forEach(b=>b.onclick=async()=>{const n=N.find(y=>y.id===b.dataset.id);if(!confirm('Delete this note? Its ledger entry is reversed and the invoice balance is restored.'))return;if(await lockedBlock(n.date))return;if(await ok(db.from('gst_notes').delete().eq('id',n.id)))render(m)});
 },'notes.html');
 </script></body></html>

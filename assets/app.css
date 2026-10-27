@@ -198,3 +198,36 @@ h1{font-size:clamp(17px,1.2vw + 8px,20px)}
 @media(min-width:2200px){body{max-width:2000px}}
 .f2{flex-wrap:wrap}
 .card{position:relative}
+
+/* ---- Nested sidebar (one menu, rendered by boot() in app.js) ---- */
+nav{position:relative;padding:2px 0 8px}
+nav .nt,nav .ng{display:flex;align-items:center;gap:9px;width:100%;margin:0 0 1px;padding:7px 10px;border:0;border-radius:8px;background:none;color:#dbe4ff;font:600 13px/1.3 inherit;font-family:inherit;text-align:left;text-decoration:none;cursor:pointer}
+nav .nt:hover,nav .ng:hover{background:#0f1d3d;color:#fff;filter:none}
+nav .nt.on{background:#1d2c57;color:#fff;box-shadow:inset 3px 0 0 #6b8cff}
+nav .ni{flex:none;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+nav .ng span,nav .nt span{flex:1;min-width:0}
+nav .nc{flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.7;transition:transform .18s}
+nav .ng[aria-expanded=true] .nc{transform:rotate(180deg)}
+nav .ngw.has>.ng{color:#fff}nav .ngw.has>.ng .ni{color:#8fb0ff;opacity:1}
+nav .nsub{margin:1px 0 5px 17px;padding-left:8px;border-left:1px solid #20345f}
+nav .nsub[hidden]{display:none}
+nav .nsub a{display:block;padding:5px 10px;margin:0 0 1px;font-size:12.5px;line-height:1.35;color:#c1cdee;border-radius:7px}
+nav .nsub a:hover{background:#0f1d3d;color:#fff}
+nav .nsub a.on{background:#1d2c57;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 #6b8cff}
+nav .nsub2{margin:0 0 3px 10px;padding-left:6px;border-left:1px dashed #2c4170}
+nav .nsub2 a{font-size:12px;padding:4px 8px}
+nav .ng:focus-visible,nav .nt:focus-visible,nav .nsub a:focus-visible{outline-color:#9db8ff;outline-offset:-2px}
+.scrim{display:none}
+.fh{flex:0 0 100%;margin:8px 0 0;font-size:13px;color:#11246b;scroll-margin-top:12px}.fh:first-child{margin-top:0}
+.qa{display:flex;flex-wrap:wrap;gap:8px}.qa a{display:inline-block;padding:7px 12px;border:1px solid #d5dbec;border-radius:8px;background:#fff;color:#11246b;font-weight:600;font-size:12.5px;text-decoration:none}.qa a:hover{background:#e0e6f8}.qa a.p{background:#11246b;color:#fff;border-color:#11246b}.qa a.p:hover{filter:brightness(1.15)}
+@supports(height:100dvh){aside{height:100dvh}}
+@media(pointer:coarse){nav .nt,nav .ng{padding:10px}nav .nsub a{padding:9px 10px}}
+@media(max-width:900px){
+ aside{visibility:hidden;transition:left .2s,visibility 0s .2s}
+ body.navopen aside{visibility:visible;transition:left .2s}
+ body.navopen .scrim{display:block;position:fixed;inset:0;z-index:20;background:#00091a99}
+ aside{width:min(280px,86vw);left:max(-290px,-90vw)}
+}
+@media(prefers-reduced-motion:reduce){nav .nc,aside{transition:none!important}}
+@media(forced-colors:active){nav .nt.on,nav .nsub a.on{outline:2px solid Highlight}}
+@media(min-width:901px){aside{width:clamp(228px,16vw,252px)}}

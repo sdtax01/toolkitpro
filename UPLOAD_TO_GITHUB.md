@@ -1,4 +1,34 @@
-# Upload to GitHub: Phase 4 audit fixes
+# Upload to GitHub: navigation restructuring (cache version 20261028)
+
+**No SQL required for this navigation restructuring.** Do not run anything in Supabase for this release.
+
+Unzip `toolkitpro-main-nav.zip` and upload the contents over your repository root (same folder names; GitHub web: Add file > Upload files, drag the folders and files, commit). Nothing needs deleting. Do not upload the zip itself.
+
+## Steps
+1. Unzip on your computer. You get one folder, `toolkitpro-main`; upload what is *inside* it so `index.html` and `assets/` sit at the repository root.
+2. GitHub > your repository > Add file > Upload files. Drag in all files and folders. Choose "Commit directly to main".
+3. Wait for GitHub Pages to redeploy (Settings > Pages shows the status, usually 1 to 2 minutes).
+4. Open the site and press Ctrl+F5 (Cmd+Shift+R on Mac) once. Every page now loads `assets/app.js?v=20261028` and `assets/app.css?v=20261028`, so other devices fetch the new files by themselves.
+5. Check: the sidebar shows Dashboard plus seven groups; open Sales > Customers and Purchases > Suppliers (the lists must differ); on a phone, the ☰ button opens the menu.
+
+## Changed files (11 with real changes, 29 with only the cache version)
+- `assets/app.js`: new `NAV` definition, active-item matching, collapsible groups, mobile drawer, scroll to `#section`. Supabase URL and anon key unchanged.
+- `assets/app.css`: sidebar styles added at the end (existing rules untouched).
+- `index.html`: Quick actions card; dashboard figures and charts unchanged.
+- `notes.html`: optional `?kind=credit|debit` filter (list view only).
+- `statement.html`: customer/supplier chooser when opened without `id`; the statement itself is unchanged.
+- `reports.html`, `statements.html`, `ledger-setup.html`: `id` attributes on existing cards, so menu items can jump to them.
+- `settings.html`: the same seven fields, now under two sub-headings (Company profile; Business & GST details); same Save. Email card gets an id.
+- `tests/browser-smoke.js`: sidebar checks added. `tests/nav.test.js`: new.
+- `README.md`, `UPLOAD_TO_GITHUB.md`, `NAVIGATION_MAP.md` (new): documentation.
+- The other 29 pages only had `?v=20261027` changed to `?v=20261028` in their script/style links.
+
+## Rolling back
+Re-upload the files from `toolkitpro-main-phase4.zip`. Nothing in the database changes, so nothing needs undoing there.
+
+---
+
+# Earlier release: Phase 4 audit fixes (kept for reference)
 
 Unzip `toolkitpro-main-phase4.zip` and upload the contents over your repository root (same folder names; GitHub web: Add file > Upload files, drag the folders, commit). Nothing needs deleting. Every page's script links now carry `?v=20261027` so browsers fetch the new JavaScript.
 

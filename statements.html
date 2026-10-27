@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script><script src="assets/reports-lib.js?v=20261027"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script><script src="assets/reports-lib.js?v=20261028"></script></head><body><script>
 const vd=s=>/^\d{4}-\d\d-\d\d$/.test(s||'')?s:null,fy0=TP.fyOf(today());let from=vd(Q.get('from'))||fy0.start,to=vd(Q.get('to'))||today();
 boot('Financial Statements',async function render(m){
  const L=await loadLedger();if(ledgerGate(m,L))return;
@@ -8,7 +8,7 @@ boot('Financial Statements',async function render(m){
  const sec=(t)=>`<tr><th scope=colgroup colspan=3>${t}</th></tr>`;
  let body='';
  if(R){const b=R.balanceSheet,q=R.balanceSheetPrior,e=b.equityAndLiabilities,eq=q.equityAndLiabilities,p=R.profitAndLoss,pp=R.profitAndLossPrior,c=R.cashFlow,pl=(k,lab)=>row(lab,p[k].total,pp[k].total);
-  body=`<div class=card><h3>Balance Sheet as at ${b.asOf}</h3><p class=k>Comparative column: ${q.asOf}.</p><table><thead><tr><th scope=col><th scope=col class=r>${b.asOf}<th scope=col class=r>${q.asOf}</tr></thead><tbody>
+  body=`<div class=card id=sch-bs><h3>Balance Sheet as at ${b.asOf}</h3><p class=k>Comparative column: ${q.asOf}.</p><table><thead><tr><th scope=col><th scope=col class=r>${b.asOf}<th scope=col class=r>${q.asOf}</tr></thead><tbody>
   ${sec('ASSETS')}${sec('Non-current assets')}${b.assets.nonCurrent.map((g,k)=>grp(g,q.assets.nonCurrent[k])).join('')}${row('<b>Total non-current assets</b>',b.assets.totalNonCurrent,q.assets.totalNonCurrent)}
   ${sec('Current assets')}${b.assets.current.map((g,k)=>grp(g,q.assets.current[k])).join('')}${row('<b>Total current assets</b>',b.assets.totalCurrent,q.assets.totalCurrent)}
   ${row('<b>TOTAL ASSETS</b>',b.assets.total,q.assets.total,'tot')}
@@ -17,11 +17,11 @@ boot('Financial Statements',async function render(m){
   ${sec('Current liabilities')}${e.currentLiabilities.map((g,k)=>grp(g,eq.currentLiabilities[k])).join('')}${row('<b>Total current liabilities</b>',e.totalCurrent,eq.totalCurrent)}
   ${row('<b>TOTAL EQUITY AND LIABILITIES</b>',e.total,eq.total,'tot')}</tbody></table>
   <p role=${b.balanced?'status':'alert'} class=${b.balanced?'up':'dn'}>${b.balanced?'Balance sheet balances.':'Does NOT balance: difference '+inr2(b.difference)+'. Check the Trial Balance.'}</p></div>
-  <div class=card><h3>Statement of Profit and Loss, ${from} to ${to}</h3><p class=k>Comparative column: the same length of period one year earlier (${pp.from} to ${pp.to}). No income-tax expense or deferred tax is booked in this ledger; profit shown is before tax.</p><table><thead><tr><th scope=col><th scope=col class=r>Current<th scope=col class=r>Comparative</tr></thead><tbody>
+  <div class=card id=sch-pl><h3>Statement of Profit and Loss, ${from} to ${to}</h3><p class=k>Comparative column: the same length of period one year earlier (${pp.from} to ${pp.to}). No income-tax expense or deferred tax is booked in this ledger; profit shown is before tax.</p><table><thead><tr><th scope=col><th scope=col class=r>Current<th scope=col class=r>Comparative</tr></thead><tbody>
   ${pl('revenue','Revenue from operations (Sales)')}${pl('otherIncome','Other income')}${row('<b>Total income</b>',p.totalIncome,pp.totalIncome)}
   ${pl('materials','Cost of goods: purchases')}${pl('inventoryChange','Changes in inventories (stock)')}${pl('depreciation','Depreciation')}${pl('otherExpenses','Other expenses')}${row('<b>Total expenses</b>',p.totalExpenses,pp.totalExpenses)}
   ${row('<b>Profit / (loss) before tax</b>',p.profitBeforeTax,pp.profitBeforeTax,'tot')}</tbody></table></div>
-  <div class=card><h3>Cash Flow Statement (indirect method), ${from} to ${to}</h3><table><tbody>
+  <div class=card id=sch-cf><h3>Cash Flow Statement (indirect method), ${from} to ${to}</h3><table><tbody>
   ${row('Profit / (loss) before tax',c.profitBeforeTax)}${row('Add: depreciation',c.depreciationAddBack)}${row('Changes in working capital (stock, debtors, other current assets, creditors, other current liabilities)',c.workingCapital)}${row('<b>Net cash from operating activities</b>',c.operating)}
   ${row('<b>Net cash from investing activities</b> (purchase of fixed assets and other non-current assets)',c.investing)}
   ${row('<b>Net cash from financing activities</b> (capital, drawings, opening balances, loans)',c.financing)}

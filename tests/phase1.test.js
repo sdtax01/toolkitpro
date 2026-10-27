@@ -6,11 +6,11 @@ let n=0;const t=(name,fn)=>{fn();n++;console.log('PASS',name)};
 // ---- helpers lifted from assets/app.js (so the real code is tested, not a copy) ----
 const src=fs.readFileSync(path.join(__dirname,'../assets/app.js'),'utf8');
 const pick=re=>{const m=src.match(re);assert(m,'missing '+re);return m[0]};
-new Function(pick(/const paise=[^\n]*/)+';'+pick(/const gst=[^\n]*/)+';this.paise=paise;this.gst=gst;this.rup=rup;').call(global=this);
+new Function(pick(/const paise=[^\n]*/)+';'+pick(/const stCode=[^\n]*/)+';'+pick(/const isInter=[^\n]*/)+';'+pick(/const gst=[^\n]*/)+';this.paise=paise;this.gst=gst;this.rup=rup;').call(global=this);
 const {paise,gst,rup}=this;
 
 t('paise rounds half-up and survives float noise',()=>{assert.strictEqual(paise(1.005),101);assert.strictEqual(paise(0.1+0.2),30);assert.strictEqual(paise(-2.5),-250);assert.strictEqual(paise('10.10'),1010);assert.strictEqual(paise(null),0)});
-t('GST: CGST+SGST always equals total tax (every odd-paisa case)',()=>{for(const rate of [5,12,18,28])for(let c=1;c<=2000;c++){const tv=c/100,g=gst(tv,rate,{state:'MH'},{state:'MH'}),tp=Math.round(paise(tv)*rate/100+1e-9);assert.strictEqual(paise(g.cgst)+paise(g.sgst),tp,tv+'@'+rate);assert(Math.abs(paise(g.cgst)-paise(g.sgst))<=1)}});
+t('GST: CGST always equals SGST (each half rounded to the paisa) and the total is within 1 paisa of rate x value',()=>{for(const rate of [3,5,12,18,28,40])for(let c=1;c<=2000;c++){const tv=c/100,g=gst(tv,rate,{state:'MH'},{state:'MH'});assert.strictEqual(paise(g.cgst),paise(g.sgst),tv+'@'+rate);assert.strictEqual(paise(g.cgst),Math.round(paise(tv)*rate/200+1e-9),tv+'@'+rate);assert(Math.abs(paise(g.cgst)+paise(g.sgst)-paise(tv)*rate/100)<=1.0001,tv+'@'+rate)}});
 t('GST: inter-state gives IGST only',()=>{const g=gst(1000,18,{state:'MH'},{state:'KA'});assert.deepStrictEqual(g,{cgst:0,sgst:0,igst:180})});
 
 const D=(n,d)=>TP.addDays(d,n);

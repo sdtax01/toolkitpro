@@ -9,7 +9,41 @@ const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth
 const paise=n=>Math.round((+n||0)*100+(n<0?-1e-9:1e-9)),rup=p=>p/100+0;
 /* GST rates offered. 3 and 40 added for the current rate structure; 12 and 28 stay so old documents can still be edited. Confirm the rate for your goods/services with your CA. */
 const RATES=[0,3,5,12,18,28,40];
-const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['stock.html','Closing Stock'],['fixed-assets.html','Fixed Assets'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['notes.html','Credit / Debit Notes'],['tds.html','TDS Entries'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['Books',[['trial-balance.html','Trial Balance'],['ledger.html','General Ledger'],['ledger.html?book=cash','Cash Book'],['daybook.html','Day Book'],['journal-new.html','Journal Entry'],['profit-loss.html','Profit & Loss'],['balance-sheet.html','Balance Sheet'],['statements.html','Financial Statements'],['bank-rec.html','Bank Reconciliation'],['year-end.html','Year-end Review'],['coa.html','Chart of Accounts'],['ledger-setup.html','Ledger Setup']]],['',[['settings.html','Settings']]]];
+/*NAV-START*/
+/* Sidebar: ONE definition, rendered by boot() on every page. Items are [label, href, optional sub-items]. Every href is relative (GitHub Pages safe) and must point at an existing page; tests/nav.test.js checks this.
+   Items with a #hash jump to a section of an existing page; they are not separate copies of the data. */
+const NAV=[
+ {t:'Dashboard',h:'index.html',i:'home'},
+ {g:'sales',t:'Sales',i:'sales',c:[['Customers','customers.html?kind=client'],['Sales Invoices','invoices.html?kind=sale'],['Credit Notes','notes.html?kind=credit'],['Debtors Ageing','ageing.html?kind=sale'],['Customer Statements','statement.html?kind=client']]},
+ {g:'purchases',t:'Purchases',i:'purchases',c:[['Suppliers','customers.html?kind=supplier'],['Purchase Bills','invoices.html?kind=purchase'],['Debit Notes','notes.html?kind=debit'],['Creditors Ageing','ageing.html?kind=purchase'],['Supplier Statements','statement.html?kind=supplier']]},
+ {g:'accounting',t:'Accounting',i:'accounting',c:[['Transactions','transactions.html'],['Income & Receipts','transactions.html?type=income'],['Expenses & Payments','transactions.html?type=expense'],['Banking','banking.html'],['Bank Reconciliation','bank-rec.html'],['Closing Stock','stock.html'],['Fixed Assets','fixed-assets.html'],['Other Assets','assets.html'],['Budgets','budgets.html'],['Financial Goals','goals.html']]},
+ {g:'tax',t:'Tax & Compliance',i:'tax',c:[['GST & Taxes','taxes.html'],['Credit / Debit Notes','notes.html'],['TDS Entries','tds.html'],['Documents & Uploads','documents.html'],['Compliance Calendar','calendar.html'],['Reminders','reminders.html']]},
+ {g:'reports',t:'Reports & Insights',i:'reports',c:[['Reports Dashboard','reports.html'],['Income & Expense Analysis','reports.html#income-expense'],['Receivables & Payables','reports.html#receivables-payables'],['Monthly / Financial Year Analysis','reports.html#monthly'],['Business Overview','overview.html'],['Daily Summary','daily.html']]},
+ {g:'books',t:'Books of Accounts',i:'books',c:[['Trial Balance','trial-balance.html'],['General Ledger','ledger.html'],['Cash Book','ledger.html?book=cash'],['Day Book','daybook.html'],['Journal Entry (Manual Posting)','journal-new.html'],['Profit & Loss','profit-loss.html'],['Balance Sheet','balance-sheet.html'],['Financial Statements (Schedule III)','statements.html',[['Balance Sheet','statements.html#sch-bs'],['Statement of Profit and Loss','statements.html#sch-pl'],['Cash Flow Statement','statements.html#sch-cf']]],['Year-end Review','year-end.html'],['Chart of Accounts','coa.html'],['Ledger Setup','ledger-setup.html']]},
+ {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Ledger Preferences','ledger-setup.html#prefs'],['Application Settings','settings.html#app']]}
+];
+/* Detail pages belong to a menu item: party.html is a customer/supplier, invoice.html and invoice-new.html are a sales invoice/purchase bill. */
+const navAlias=(f,q)=>f==='party.html'?['customers.html',{kind:q.kind==='supplier'?'supplier':'client'}]:(f==='invoice.html'||f==='invoice-new.html')?['invoices.html',{kind:q.kind==='purchase'?'purchase':'sale'}]:f==='statement.html'?['statement.html',{kind:q.kind==='supplier'?'supplier':'client'}]:[f,q];
+const navLeaves=()=>NAV.flatMap(n=>n.c?n.c.flatMap(([l,h,s])=>[[l,h,n.g],...(s||[]).map(([l2,h2])=>[l2,h2,n.g])]):[[n.t,n.h,'']]);
+/* Returns the href of the menu item that matches the page: same file, every query parameter of the item present with the same value, and the #hash when the item has one. The most specific match wins. */
+function navFind(file,query,hash,act){
+ const[f,q]=navAlias(file||'index.html',query);let best=null,sc=-1,any=null;
+ for(const[,h]of navLeaves()){const[p,hs]=h.split('#'),[pf,ps]=p.split('?'),pq=new URLSearchParams(ps||'');
+  if(pf!==f)continue;if(!any)any=h;let ok=true,s=0;pq.forEach((v,k)=>{if(q[k]===v)s++;else ok=false});
+  if(!ok)continue;if(hs){if('#'+hs!==hash)continue;s+=.5}
+  if(s>sc){sc=s;best=h}}
+ return best||any||(act&&navLeaves().some(l=>l[1]===act)?act:null)}
+const NAVI={home:'M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z',sales:'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z M14 3v5h5 M9 13h6 M9 17h6',purchases:'M6 6h15l-1.5 9h-12z M6 6L5 3H2 M9 20h.01 M18 20h.01',accounting:'M3 7a2 2 0 0 1 2-2h13v4 M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z M16 14h.01',tax:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z M9 12l2 2 4-4',reports:'M4 20h16 M7 20v-6 M12 20V6 M17 20v-9',books:'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',settings:'M4 6h9 M17 6h3 M4 12h3 M11 12h9 M4 18h11 M19 18h1 M15 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4z M9 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4z M17 16a2 2 0 1 0 0 4 2 2 0 0 0 0-4z'};
+const navIcon=k=>`<svg class=ni viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="${NAVI[k]}"/></svg>`;
+const NAVCHEV='<svg class=nc viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg>';
+const navSaved=()=>{try{return JSON.parse(localStorage.getItem('tp.nav')||'[]')}catch(_){return[]}};
+const navSave=l=>{try{localStorage.setItem('tp.nav',JSON.stringify(l))}catch(_){}};
+function navHTML(on){
+ const open=new Set(navSaved()),lk=(l,h,c)=>`<a href="${h}" class="${c||''}${h===on?' on':''}"${h===on?' aria-current="page"':''}>${l}</a>`;
+ return NAV.map(n=>{if(!n.c)return`<a href="${n.h}" class="nt${n.h===on?' on':''}"${n.h===on?' aria-current="page"':''}>${navIcon(n.i)}<span>${n.t}</span></a>`;
+  const has=n.c.some(([,h,s])=>h===on||(s||[]).some(x=>x[1]===on)),o=has||open.has(n.g);
+  return`<div class="ngw${has?' has':''}" data-g="${n.g}"><button type=button class=ng id="nv-b-${n.g}" aria-expanded="${o}" aria-controls="nv-${n.g}">${navIcon(n.i)}<span>${n.t}</span>${NAVCHEV}</button><div class=nsub id="nv-${n.g}" role=group aria-labelledby="nv-b-${n.g}"${o?'':' hidden'}>${n.c.map(([l,h,s])=>lk(l,h)+(s?`<div class=nsub2>${s.map(([l2,h2])=>lk(l2,h2)).join('')}</div>`:'')).join('')}</div></div>`}).join('')}
+/*NAV-END*/
 const Q=new URLSearchParams(location.search);
 const inr2=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const stat=x=>{const o=paise(x.amount)-paise(x.paid)-paise(x.adjusted);if(o<=0)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return(+x.paid>0||+x.adjusted>0)?['Partially paid','pp']:['Unpaid','du']};
@@ -106,7 +140,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261027" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261028" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -160,10 +194,19 @@ function login(){
  $('#e').focus()}
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
- const cur=act||location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261027" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}"${(h===cur||(h==='index.html'&&cur===''))?' aria-current="page"':''}>${n}</a>`).join('')).join('')}</nav></aside><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="main">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
- $('#mn').onclick=()=>{const o=document.body.classList.toggle('navopen');$('#mn').setAttribute('aria-expanded',o)};
+ const file=location.pathname.split('/').pop()||'index.html',Qo=Object.fromEntries(Q),fb=act||file+location.search,nowOn=()=>navFind(file,Qo,location.hash,fb),on=nowOn();
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261028" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ const setNav=o=>{document.body.classList.toggle('navopen',o);$('#mn').setAttribute('aria-expanded',o)};
+ $('#mn').onclick=()=>setNav(!document.body.classList.contains('navopen'));
+ $('#scrim').onclick=()=>setNav(false);
+ addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('navopen')){setNav(false);$('#mn').focus()}});
+ const nv=$('nav');
+ nv.addEventListener('click',e=>{if(e.target.closest('a'))setNav(false)});
+ nv.querySelectorAll('.ng').forEach(b=>b.onclick=()=>{const o=b.getAttribute('aria-expanded')!=='true',s=new Set(navSaved());b.setAttribute('aria-expanded',o);document.getElementById(b.getAttribute('aria-controls')).hidden=!o;o?s.add(b.parentNode.dataset.g):s.delete(b.parentNode.dataset.g);navSave([...s])});
+ /* #hash menu items stay on the same page: re-mark the active item when the hash changes. */
+ addEventListener('hashchange',()=>{const o=nowOn();nv.querySelectorAll('a').forEach(a=>{const y=a.getAttribute('href')===o;a.classList.toggle('on',y);y?a.setAttribute('aria-current','page'):a.removeAttribute('aria-current')});nv.querySelectorAll('.ngw').forEach(w=>{const h=!!w.querySelector('a.on');w.classList.toggle('has',h);if(h){w.querySelector('.ng').setAttribute('aria-expanded','true');w.querySelector('.nsub').hidden=false}})});
+ {const a=nv.querySelector('a.on');if(a)nv.scrollTop=Math.max(0,a.offsetTop-nv.clientHeight/2)}
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{S}=await load();if(S.business_name)$('#who').textContent=S.business_name};
- const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp}catch(e){$('#main').innerHTML='<div class="card dn" role="alert">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run. <button class=g id=retry>Retry</button></div>';const rb=$('#retry');if(rb)rb.onclick=()=>{$('#main').innerHTML=SKEL;run()}}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
+ let first=1;const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp;if(first){first=0;try{const h=location.hash.slice(1),t=h&&document.getElementById(decodeURIComponent(h));if(t)t.scrollIntoView()}catch(_){}}}catch(e){$('#main').innerHTML='<div class="card dn" role="alert">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run. <button class=g id=retry>Retry</button></div>';const rb=$('#retry');if(rb)rb.onclick=()=>{$('#main').innerHTML=SKEL;run()}}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
  window.refresh=run;await run();let rt;db.channel('live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(run,400)}).subscribe();}
