@@ -7,13 +7,14 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 /* Money: amounts are INR, held as integer paise for arithmetic, rounded half-up to 2 decimals, stored as numeric(.,2). */
 const paise=n=>Math.round((+n||0)*100+(n<0?-1e-9:1e-9)),rup=p=>p/100+0;
-const RATES=[0,5,12,18,28];
-const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['Books',[['trial-balance.html','Trial Balance'],['ledger.html','General Ledger'],['ledger.html?book=cash','Cash Book'],['daybook.html','Day Book'],['journal-new.html','Journal Entry'],['profit-loss.html','Profit & Loss'],['balance-sheet.html','Balance Sheet'],['bank-rec.html','Bank Reconciliation'],['year-end.html','Year-end Review'],['coa.html','Chart of Accounts'],['ledger-setup.html','Ledger Setup']]],['',[['settings.html','Settings']]]];
+/* GST rates offered. 3 and 40 added for the current rate structure; 12 and 28 stay so old documents can still be edited. Confirm the rate for your goods/services with your CA. */
+const RATES=[0,3,5,12,18,28,40];
+const NAV=[['Home',[['index.html','Dashboard'],['daily.html','Daily Summary'],['overview.html','Overview']]],['Sales',[['customers.html?kind=client','Customers'],['invoices.html?kind=sale','Invoices'],['ageing.html?kind=sale','Debtors Ageing']]],['Purchases',[['customers.html?kind=supplier','Suppliers'],['invoices.html?kind=purchase','Bills'],['ageing.html?kind=purchase','Creditors Ageing']]],['Accounting',[['transactions.html','Transactions'],['stock.html','Closing Stock'],['fixed-assets.html','Fixed Assets'],['transactions.html?type=income','Income'],['transactions.html?type=expense','Expenses'],['banking.html','Banking'],['assets.html','Assets'],['budgets.html','Budgets'],['goals.html','Goals']]],['Compliance',[['taxes.html','GST & Taxes'],['notes.html','Credit / Debit Notes'],['tds.html','TDS Entries'],['documents.html','Documents'],['calendar.html','Calendar'],['reminders.html','Reminders']]],['Insights',[['reports.html','Reports']]],['Books',[['trial-balance.html','Trial Balance'],['ledger.html','General Ledger'],['ledger.html?book=cash','Cash Book'],['daybook.html','Day Book'],['journal-new.html','Journal Entry'],['profit-loss.html','Profit & Loss'],['balance-sheet.html','Balance Sheet'],['statements.html','Financial Statements'],['bank-rec.html','Bank Reconciliation'],['year-end.html','Year-end Review'],['coa.html','Chart of Accounts'],['ledger-setup.html','Ledger Setup']]],['',[['settings.html','Settings']]]];
 const Q=new URLSearchParams(location.search);
 const inr2=n=>'₹'+Number(n||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const stat=x=>{const o=paise(x.amount)-paise(x.paid);if(o<=0)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return+x.paid>0?['Partially paid','pp']:['Unpaid','du']};
+const stat=x=>{const o=paise(x.amount)-paise(x.paid)-paise(x.adjusted);if(o<=0)return['Paid','ok'];if(x.due_date&&days(x.due_date)<0)return['Overdue','od'];return(+x.paid>0||+x.adjusted>0)?['Partially paid','pp']:['Unpaid','du']};
 const badge=x=>{const[t,c]=stat(x);return`<span class="bd ${c}">${t}</span>`};
-async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices (0, 5, 12, 18, 28)',S.default_gst??18);if(ans===null)return false;const r=+ans;if(!RATES.includes(r)){alert('Enter one of: '+RATES.join(', '));return false}
+async function fixGst(list,S,p){const ans=prompt('GST rate % for these invoices ('+RATES.join(', ')+')',S.default_gst??18);if(ans===null)return false;const r=+ans;if(!RATES.includes(r)){alert('Enter one of: '+RATES.join(', '));return false}
  const incl=confirm('Do the existing amounts already include GST?\nOK = included (total stays the same)\nCancel = GST is extra (total increases)');
  for(const x of list){const a=+x.amount,tv=incl?+(a/(1+r/100)).toFixed(2):a,g=gst(tv,r,S,p.find(y=>y.id===x.party_id)),tax=incl?rup(paise(a)-paise(tv)):rup(paise(g.cgst)+paise(g.sgst)+paise(g.igst)),hp=Math.floor(paise(tax)/2),c=g.igst?{cgst:0,sgst:0,igst:tax}:{cgst:rup(hp),sgst:rup(paise(tax)-hp),igst:0};
   if(!(await ok(db.from('invoices').update({taxable:tv,gst_rate:r,...c,amount:rup(paise(tv)+paise(tax))}).eq('id',x.id))))return false}toast('GST updated');return true}
@@ -23,12 +24,21 @@ let LP=null;const load0=async()=>{const q=n=>fetchAll(()=>db.from(n).select('*')
 const load=()=>LP||load0();
 const sum=(l,t)=>l.filter(x=>x.type===t).reduce((s,x)=>s+paise(x.amount),0)/100;
 const bal=(a,t)=>a.map(x=>{const l=t.filter(y=>y.account_id===x.id);return{...x,inc:sum(l,'income'),exp:sum(l,'expense'),bal:rup(paise(x.opening)+paise(sum(l,'income'))-paise(sum(l,'expense')))}});
-const owed=(i,k)=>i.filter(x=>x.kind===k).reduce((s,x)=>s+paise(x.amount)-paise(x.paid),0)/100;
+const owed=(i,k)=>i.filter(x=>x.kind===k).reduce((s,x)=>s+paise(x.amount)-paise(x.paid)-paise(x.adjusted),0)/100;
 const spent=(t,c,mo)=>t.filter(x=>x.type==='expense'&&x.date.startsWith(mo)&&(x.category||'').trim().toLowerCase()===c.trim().toLowerCase()).reduce((s,x)=>s+paise(x.amount),0)/100;
 const days=d=>Math.round((new Date(d)-new Date(today()))/864e5);
 const due=d=>{const n=days(d);return n<0?`Overdue ${-n}d`:n===0?'Due today':`Due in ${n} days`};
 const taxOf=x=>(+x.cgst||0)+(+x.sgst||0)+(+x.igst||0);
-const gst=(taxable,rate,S,P)=>{const tp=Math.round(paise(taxable)*rate/100+1e-9),tax=rup(tp),inter=!!(S?.state&&P?.state&&S.state.trim().toLowerCase()!==P.state.trim().toLowerCase()),h=Math.floor(tp/2);return inter?{cgst:0,sgst:0,igst:tax}:{cgst:rup(h),sgst:rup(tp-h),igst:0}};
+/* GSTIN: 15 characters, first two = state code, last = check character. stCode() reads the state code only when the GSTIN is well formed. */
+const GSTIN_CH='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const gstinOk=g=>{g=String(g||'').trim().toUpperCase();if(!/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g))return false;let s=0;for(let i=0;i<14;i++){let v=GSTIN_CH.indexOf(g[i])*(i%2?2:1);s+=Math.floor(v/36)+v%36}return g[14]===GSTIN_CH[(36-s%36)%36]};
+const stCode=g=>{g=String(g||'').trim().toUpperCase();return/^\d{2}[A-Z0-9]{13}$/.test(g)?g.slice(0,2):null};
+/* Blank is fine. A GSTIN that fails the format/check-digit test asks for confirmation (it never blocks, so existing work is not hampered). */
+const gstinGate=g=>{g=String(g||'').trim();return!g||gstinOk(g)||confirm('This GSTIN looks invalid (format or check digit). Save it anyway?')};
+/* Inter-state when the two GSTIN state codes differ; if either GSTIN is missing/malformed, fall back to comparing the State names as before. */
+const isInter=(S,P)=>{const a=stCode(S?.gstin),b=stCode(P?.gstin);if(a&&b)return a!==b;return!!(S?.state&&P?.state&&S.state.trim().toLowerCase()!==P.state.trim().toLowerCase())};
+/* CGST and SGST are each half the rate on the taxable value and are always equal (each rounded half-up to the paisa); IGST is the full rate. */
+const gst=(taxable,rate,S,P)=>{const tp=paise(taxable);if(isInter(S,P))return{cgst:0,sgst:0,igst:rup(Math.round(tp*rate/100+1e-9))};const h=Math.round(tp*rate/200+1e-9);return{cgst:rup(h),sgst:rup(h),igst:0}};
 const bar=(v,max)=>{const p=max?v/max*100:0;return`<div class=bar><i class="${p>100?'dn':''}" style="width:${Math.min(100,p)}%"></i></div>`};
 const ok=async p=>{const r=await p;if(r.error){alert(r.error.message);return false}return true};
 const toast=m=>{const d=document.createElement('div');d.className='toast';d.setAttribute('role','status');d.setAttribute('aria-live','polite');d.textContent=m;document.body.appendChild(d);setTimeout(()=>d.remove(),3500)};
@@ -96,7 +106,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261024" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261027" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -151,7 +161,7 @@ function login(){
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const cur=act||location.pathname.split('/').pop()+location.search;
- document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261024" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}"${(h===cur||(h==='index.html'&&cur===''))?' aria-current="page"':''}>${n}</a>`).join('')).join('')}</nav></aside><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="main">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261027" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${NAV.map(([g,l])=>(g?`<div class=grp>${g}</div>`:'')+l.map(([h,n])=>`<a href="${h}" class="${(h===cur||(h==='index.html'&&cur===''))?'on':''}"${(h===cur||(h==='index.html'&&cur===''))?' aria-current="page"':''}>${n}</a>`).join('')).join('')}</nav></aside><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="main">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  $('#mn').onclick=()=>{const o=document.body.classList.toggle('navopen');$('#mn').setAttribute('aria-expanded',o)};
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{S}=await load();if(S.business_name)$('#who').textContent=S.business_name};

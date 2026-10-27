@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
+const need=(m,n,what)=>{m.innerHTML=`<div class=card role=status><h3>${what} not installed yet</h3><p>Run <b>${n}</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor (after the earlier migrations), then reload. Everything else keeps working without it.</p></div>`};
+boot('Closing Stock',async function render(m){
+ const L=await loadLedger();if(ledgerGate(m,L))return;
+ const sq=await db.from('stock_valuations').select('*').order('as_on',{ascending:false});
+ if(sq.error){if(noTable(sq.error))return need(m,'016 and 017_stock_fixed_assets.sql','Closing stock');throw sq.error}
+ const V=sq.data||[],jr=new Set(L.journals.filter(j=>j.reverses).map(j=>j.reverses)),inv=L.accts.find(a=>a.system_key==='inventory');
+ const cur=inv?L.lines.filter(l=>l.gl_account_id===inv.id).reduce((s,l)=>s+paise(l.debit)-paise(l.credit),0):0;
+ m.innerHTML=`<div class="row c4"><div class=card><div class=k>Inventory in the ledger</div><div class=v>${inr2(rup(cur))}</div></div></div>
+ <div class=card><h3>Enter closing stock</h3><p class=k>Purchases stay in the Purchases account. Enter the <b>value of stock on hand</b> at period end (from your stock count or stock records): the system posts only the <i>difference</i> from the current Inventory balance (Dr/Cr Inventory against <i>Change in inventories</i>). Cost of goods consumed = Purchases + Change in inventories. Enter entries in date order; reverse a wrong one from Journal Entry. Stock is normally valued at the lower of cost and net realisable value (Ind AS 2 / AS 2): confirm the valuation with your CA.</p>
+ <form id=f class=g2><label>Stock as on<input type=date name=d value="${today()}" required></label><label>Value of stock (₹)<input name=v type=number min=0 step=0.01 required></label>
+ <label>Basis<select name=b><option value=weighted_average>Weighted average cost<option value=fifo>FIFO<option value=other>Other</select></label><label>Note<input name=n placeholder="e.g. physical count 31 Mar"></label>
+ <div class="f2 full"><button>Post closing stock</button></div></form></div>
+ <div class=card><h3>History</h3><table><tr><th>As on<th class=r>Value<th>Basis<th>Note<th>Status</tr>${V.map(v=>`<tr><td>${v.as_on}<td class=r>${inr2(v.value)}<td>${esc(String(v.method).replace('_',' '))}<td>${esc(v.note||'')}<td>${v.journal_id?(jr.has(v.journal_id)?'<span class="bd od">Reversed</span>':'<span class="bd ok">Posted</span>'):'No change'}</tr>`).join('')||'<tr><td colspan=5>No entries yet.</tr>'}</table></div>`;
+ const f=$('#f');f.onsubmit=ev=>{ev.preventDefault();return guard(f,async()=>{const e=f.elements;if(await lockedBlock(e.d.value))return;
+  const r=await db.rpc('set_closing_stock',{p_date:e.d.value,p_value:rup(paise(e.v.value)),p_method:e.b.value,p_note:e.n.value.trim()||null});
+  if(r.error)return alert(r.error.message);toast(r.data&&r.data.journal_id?'Closing stock posted':'No change in stock value');render(m)})};
+},'stock.html');
+</script></body></html>

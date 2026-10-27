@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/vendor/chart.umd.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/vendor/chart.umd.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
 let mo=today().slice(0,7),ch={};
 const draw=(id,cfg)=>{ch[id]?.destroy();const el=document.getElementById(id);if(cfg.type==='doughnut'&&!cfg.data.datasets[0].data.some(v=>v>0)){el.parentNode.style.height='auto';el.parentNode.innerHTML='<p class=k>No data for this period yet.</p>';return}ch[id]=new Chart(el,cfg)};
 const pct=(a,b)=>b?((a-b)/b*100).toFixed(1)+'% vs last month':'—';
@@ -13,7 +13,7 @@ async function render(m){
  const ec=cat(cm,'expense'),ic=cat(cm,'income');
  const port=[['Bank & cash',Math.max(cash,0)],['Receivables',rec]];h.forEach(x=>{const e=port.find(p=>p[0]===x.category);e?e[1]+= +x.value:port.push([x.category,+x.value])});
  const ta=port.reduce((s,p)=>s+p[1],0);
- const up=[...r.filter(x=>!x.done).map(x=>({t:x.title,d:x.due_date})),...i.filter(x=>x.amount-x.paid>0&&x.due_date).map(x=>({t:(x.kind==='sale'?'Collect invoice ':'Pay invoice ')+x.number,d:x.due_date}))].sort((p,q)=>p.d<q.d?-1:1).slice(0,5);
+ const up=[...r.filter(x=>!x.done).map(x=>({t:x.title,d:x.due_date})),...i.filter(x=>x.amount-x.paid-(+x.adjusted||0)>0&&x.due_date).map(x=>({t:(x.kind==='sale'?'Collect invoice ':'Pay invoice ')+x.number,d:x.due_date}))].sort((p,q)=>p.d<q.d?-1:1).slice(0,5);
  const card=(k,v,s,c='')=>`<div class="card"><div class=k>${k}</div><div class=v>${v}</div><div class="k ${c}">${s}</div></div>`;
  m.innerHTML=`<div><input type=month id=mo value="${mo}"></div>
  <div class="row c6">${card('Total Income',inr(inc),pct(inc,sum(pv,'income')),'up')}${card('Total Expenses',inr(exp),pct(exp,sum(pv,'expense')),'dn')}${card('Net Profit',inr(inc-exp),'This month',inc>=exp?'up':'dn')}${card('Total Receivables',inr(rec),'Due from clients')}${card('Total Payables',inr(pay),'Due to suppliers')}${card('Cash Balance',inr(cash),'In all accounts')}</div>

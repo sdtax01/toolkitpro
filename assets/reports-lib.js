@@ -13,7 +13,7 @@ const TP=(()=>{
  function ageing(invoices,parties,kind,asOf){
   const pm=new Map((parties||[]).map(p=>[p.id,p])),map=new Map(),tot=empty();let noDue=0,count=0;
   for(const x of invoices||[]){
-   if(x.kind!==kind)continue;const bal=paise(x.amount)-paise(x.paid);if(bal<=0)continue;
+   if(x.kind!==kind)continue;const bal=paise(x.amount)-paise(x.paid)-paise(x.adjusted);if(bal<=0)continue;
    if(!x.due_date)noDue++;
    const od=diff(asOf,x.due_date||x.date),b=bucketOf(od);count++;
    let r=map.get(x.party_id);if(!r){const p=pm.get(x.party_id);r={id:x.party_id,name:p?p.name:'(deleted contact)',party:p||null,b:empty(),invoices:[],oldest:0};map.set(x.party_id,r)}
@@ -26,13 +26,14 @@ const TP=(()=>{
  }
 
  /* Party statement: invoices raise the balance, linked payments reduce it. Optional from/to (inclusive, YYYY-MM-DD). */
- function statement(party,invoices,txns,from,to){
+ function statement(party,invoices,txns,from,to,adjs){
   const sale=party.kind==='client'?'sale':'purchase',mine=(invoices||[]).filter(x=>x.party_id===party.id&&x.kind===sale),ids=new Set(mine.map(x=>x.id));
   const ev=[];let seq=0;
   for(const x of mine)ev.push({date:x.date,ord:0,seq:seq++,type:'Invoice',ref:x.number,billed:paise(x.amount),paid:0});
   const linked=new Map();
   for(const t of txns||[]){if(!ids.has(t.invoice_id))continue;linked.set(t.invoice_id,(linked.get(t.invoice_id)||0)+paise(t.amount));
    ev.push({date:t.date,ord:1,seq:seq++,type:'Payment',ref:t.description||'',billed:0,paid:paise(t.amount)})}
+  for(const a of adjs||[]){if(!ids.has(a.invoice_id))continue;ev.push({date:a.date,ord:1,seq:seq++,type:a.label||'Adjustment',ref:a.ref||'',billed:0,paid:paise(a.amount)})}
   ev.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:a.ord-b.ord||a.seq-b.seq);
   let bal=0,opening=0,billed=0,paid=0;const rows=[];
   for(const e of ev){
@@ -41,7 +42,7 @@ const TP=(()=>{
    bal+=e.billed-e.paid;billed+=e.billed;paid+=e.paid;rows.push({date:e.date,type:e.type,ref:e.ref,billed:rup(e.billed),paid:rup(e.paid),balance:rup(bal)});
   }
   const mismatches=mine.filter(x=>paise(x.paid)!==(linked.get(x.id)||0)).map(x=>({number:x.number,recorded:rup(paise(x.paid)),linked:rup(linked.get(x.id)||0)}));
-  const outstandingNow=rup(mine.reduce((s,x)=>s+paise(x.amount)-paise(x.paid),0));
+  const outstandingNow=rup(mine.reduce((s,x)=>s+paise(x.amount)-paise(x.paid)-paise(x.adjusted),0));
   return{opening:rup(opening),billed:rup(billed),paid:rup(paid),closing:rup(bal),rows,mismatches,outstandingNow};
  }
 
@@ -52,7 +53,7 @@ const TP=(()=>{
   const accounts=a.map(x=>{const l=upto.filter(y=>y.account_id===x.id);return{id:x.id,name:x.name,balance:rup(paise(x.opening)+sum(l,'income')-sum(l,'expense'))}});
   const un=upto.filter(x=>!x.account_id),unassigned=rup(sum(un,'income')-sum(un,'expense'));
   const cash=rup(accounts.reduce((s,x)=>s+paise(x.balance),0)+paise(unassigned));
-  const due=kind=>{const l=(i||[]).filter(x=>x.kind===kind&&paise(x.amount)-paise(x.paid)>0&&x.date<=date),od=l.filter(x=>diff(date,x.due_date||x.date)>0),soon=l.filter(x=>{const d=diff(x.due_date||x.date,date);return d>=0&&d<=7}),s=q=>rup(q.reduce((z,x)=>z+paise(x.amount)-paise(x.paid),0));
+  const due=kind=>{const l=(i||[]).filter(x=>x.kind===kind&&paise(x.amount)-paise(x.paid)-paise(x.adjusted)>0&&x.date<=date),od=l.filter(x=>diff(date,x.due_date||x.date)>0),soon=l.filter(x=>{const d=diff(x.due_date||x.date,date);return d>=0&&d<=7}),s=q=>rup(q.reduce((z,x)=>z+paise(x.amount)-paise(x.paid)-paise(x.adjusted),0));
    return{overdueCount:od.length,overdue:s(od),soonCount:soon.length,soon:s(soon)}};
   const topDebtors=ageing((i||[]).filter(x=>x.date<=date),p||[],'sale',date).rows.filter(x=>x.overdue>0).sort((u,v)=>v.overdue-u.overdue).slice(0,5);
   const rem=(r||[]).filter(x=>!x.done&&x.due_date<=addDays(date,7)).sort((u,v)=>u.due_date<v.due_date?-1:1);
@@ -120,7 +121,7 @@ const TP=(()=>{
  function reconcile({lines,accts,invoices,txns,bankAccounts}){
   const sys=new Map((accts||[]).filter(a=>a.system_key).map(a=>[a.system_key,a])),ids=k=>sys.get(k)?.id;
   const net=(pred)=>(lines||[]).filter(pred).reduce((s,l)=>s+paise(l.debit)-paise(l.credit),0);
-  const out=(kind)=>(invoices||[]).filter(x=>x.kind===kind).reduce((s,x)=>s+paise(x.amount)-paise(x.paid),0);
+  const out=(kind)=>(invoices||[]).filter(x=>x.kind===kind).reduce((s,x)=>s+paise(x.amount)-paise(x.paid)-paise(x.adjusted),0);
   const mk=(name,l,b)=>({name,ledger:rup(l),books:rup(b),diff:rup(l-b),ok:l===b});
   const rec=mk('Debtors (accounts receivable) vs unpaid sales invoices',net(l=>l.gl_account_id===ids('receivables')),out('sale'));
   const pay=mk('Creditors (accounts payable) vs unpaid bills',-net(l=>l.gl_account_id===ids('payables')),out('purchase'));
@@ -131,7 +132,7 @@ const TP=(()=>{
   // per-party receivable/payable differences
   const parties=[];for(const [key,kind,sign] of [['receivables','sale',1],['payables','purchase',-1]]){const g=ids(key),led=new Map(),sub=new Map();
    for(const l of lines||[]){if(l.gl_account_id!==g||!l.party_id)continue;led.set(l.party_id,(led.get(l.party_id)||0)+sign*(paise(l.debit)-paise(l.credit)))}
-   for(const x of invoices||[]){if(x.kind!==kind)continue;sub.set(x.party_id,(sub.get(x.party_id)||0)+paise(x.amount)-paise(x.paid))}
+   for(const x of invoices||[]){if(x.kind!==kind)continue;sub.set(x.party_id,(sub.get(x.party_id)||0)+paise(x.amount)-paise(x.paid)-paise(x.adjusted))}
    for(const id of new Set([...led.keys(),...sub.keys()])){const a=led.get(id)||0,b=sub.get(id)||0;if(a!==b)parties.push({party_id:id,kind,ledger:rup(a),books:rup(b),diff:rup(a-b)})}}
   return{checks:[rec,pay,...banks,cash],trialBalanceBalanced:tb.balanced,partyDifferences:parties,allOk:tb.balanced&&[rec,pay,...banks,cash].every(c=>c.ok)&&!parties.length};
  }
@@ -154,6 +155,51 @@ const TP=(()=>{
   const pri=paise(prior.netProfit),cu=paise(cur.netProfit),eqTot=E.total+pri+cu;
   return{asOf,fy:fy.label,assets:A.rows,liabilities:L.rows,equity:E.rows,priorProfit:prior.netProfit,currentProfit:cur.netProfit,
    totalAssets:rup(A.total),totalLiabilities:rup(L.total),totalEquity:rup(eqTot),totalLiabEquity:rup(L.total+eqTot),balanced:A.total===L.total+eqTot,difference:rup(A.total-L.total-eqTot)};
+ }
+
+ /* ---------------- Phase 4: Schedule III style statements and cash flow (derived from the ledger) ----------------
+    Grouping uses account type, system key and code ranges (assets 1500-1599 = property, plant and equipment; 1600+ = other non-current;
+    liabilities 2500+ = non-current). It is a presentation aid: confirm the classification and disclosures with your CA. */
+ function finStatements(accts,lines,from,to){
+  const byId=new Map((accts||[]).map(a=>[a.id,a])),root=a=>{let p=a,n=0;while(p&&p.parent_id&&byId.get(p.parent_id)&&n++<10)p=byId.get(p.parent_id);return p||a};
+  const num=a=>{const c=parseInt(a.code,10);return isNaN(c)?0:c};
+  const grp=a=>{const r=root(a),c=num(a);
+   if(a.type==='asset'){if(a.bank_account_id||a.system_key==='cash')return'cash';if(r.system_key==='receivables')return'receivables';if(a.system_key==='inventory')return'inventory';
+     if(c>=1500&&c<1600)return'ppe';if(c>=1600)return'nca';return'oca'}
+   if(a.type==='liability'){if(r.system_key==='payables')return'payables';return c>=2500?'ncl':'ocl'}
+   if(a.type==='equity')return'equity';
+   if(a.type==='income')return r.system_key==='sales'?'revenue':'other_income';
+   if(a.system_key==='stock_adjust')return'inv_change';if(a.system_key==='depreciation')return'depreciation';return r.system_key==='purchases'?'materials':'other_exp'};
+  const bsAt=asOf=>{const all=sumBy(accts,lines,null,asOf),fy=fyOf(asOf),cur=profitAndLoss(accts,lines,fy.start,asOf),pri=profitAndLoss(accts,lines,null,addDays(fy.start,-1)),G={};
+   for(const {a,d,c} of all.values()){if(!(d||c))continue;if(a.type==='income'||a.type==='expense')continue;const g=grp(a),v=a.type==='asset'?d-c:c-d;(G[g]=G[g]||{rows:[],total:0});G[g].rows.push({code:a.code,label:fullName(a,accts),amount:rup(v)});G[g].total+=v}
+   const t=k=>(G[k]?G[k].total:0),rows=k=>G[k]?G[k].rows:[];
+   const eq=t('equity')+paise(pri.netProfit)+paise(cur.netProfit);
+   const nca=t('ppe')+t('nca'),ca=t('inventory')+t('receivables')+t('cash')+t('oca'),ncl=t('ncl'),cl=t('payables')+t('ocl');
+   return{asOf,fy:fy.label,priorProfit:pri.netProfit,currentProfit:cur.netProfit,
+    assets:{nonCurrent:[{title:'Property, plant and equipment (net of depreciation)',rows:rows('ppe'),total:rup(t('ppe'))},{title:'Other non-current assets',rows:rows('nca'),total:rup(t('nca'))}],totalNonCurrent:rup(nca),
+     current:[{title:'Inventories',rows:rows('inventory'),total:rup(t('inventory'))},{title:'Trade receivables',rows:rows('receivables'),total:rup(t('receivables'))},{title:'Cash and cash equivalents',rows:rows('cash'),total:rup(t('cash'))},{title:'Other current assets',rows:rows('oca'),total:rup(t('oca'))}],totalCurrent:rup(ca),total:rup(nca+ca)},
+    equityAndLiabilities:{equity:{rows:rows('equity'),retainedEarlier:pri.netProfit,profitForYear:cur.netProfit,total:rup(eq)},
+     nonCurrentLiabilities:{rows:rows('ncl'),total:rup(ncl)},
+     currentLiabilities:[{title:'Trade payables',rows:rows('payables'),total:rup(t('payables'))},{title:'Other current liabilities (incl. GST, TDS and advances)',rows:rows('ocl'),total:rup(t('ocl'))}],totalCurrent:rup(cl),total:rup(eq+ncl+cl)},
+    balanced:nca+ca===eq+ncl+cl,difference:rup(nca+ca-eq-ncl-cl)}};
+  const plIn=(f,t)=>{const m=sumBy(accts,lines,f,t),G={};
+   for(const {a,d,c} of m.values()){if(a.type!=='income'&&a.type!=='expense')continue;if(!(d||c))continue;const g=grp(a),v=a.type==='income'?c-d:d-c;(G[g]=G[g]||{rows:[],total:0});G[g].rows.push({code:a.code,label:fullName(a,accts),amount:rup(v)});G[g].total+=v}
+   const t0=k=>(G[k]?G[k].total:0),r=k=>({rows:G[k]?G[k].rows:[],total:rup(t0(k))}),inc=t0('revenue')+t0('other_income'),exp=t0('materials')+t0('inv_change')+t0('depreciation')+t0('other_exp');
+   return{from:f||null,to:t||null,revenue:r('revenue'),otherIncome:r('other_income'),totalIncome:rup(inc),materials:r('materials'),inventoryChange:r('inv_change'),depreciation:r('depreciation'),otherExpenses:r('other_exp'),totalExpenses:rup(exp),profitBeforeTax:rup(inc-exp),isLoss:inc-exp<0}};
+  const start=addDays(from,-1),open=bsAt(start),close=bsAt(to),pl=plIn(from,to);
+  const plPrev=plIn((+from.slice(0,4)-1)+from.slice(4),start);
+  /* cash flow (indirect): movement per account in the period; every account lands in exactly one bucket, so it always agrees with the change in cash */
+  const mv=sumBy(accts,lines,from,to);let prof=0,dep=0,wc=0,inv=0,fin=0,dcash=0;
+  for(const {a,d,c} of mv.values()){const m=d-c;if(!m)continue;const g=grp(a);
+   if(a.type==='income'||a.type==='expense'){prof-=m;if(g==='depreciation')dep+=m}
+   else if(g==='cash')dcash+=m;
+   else if(g==='ppe'||g==='nca')inv-=m;
+   else if(g==='inventory'||g==='receivables'||g==='oca'||g==='payables'||g==='ocl')wc-=m;
+   else fin-=m}
+  const ops=prof+dep+wc,investing=inv-dep,net=ops+investing+fin,openCash=open.assets.current[2].total,closeCash=close.assets.current[2].total;
+  const cf={from,to,profitBeforeTax:rup(prof),depreciationAddBack:rup(dep),workingCapital:rup(wc),operating:rup(ops),investing:rup(investing),financing:rup(fin),netChange:rup(net),openingCash:openCash,closingCash:closeCash,
+   agrees:net===dcash&&paise(openCash)+net===paise(closeCash),difference:rup(net-dcash)};
+  return{from,to,balanceSheet:close,balanceSheetPrior:open,profitAndLoss:pl,profitAndLossPrior:plPrev,cashFlow:cf};
  }
  /* Parse a bank statement CSV. Accepts Date, Description, (Reference), and either Debit/Credit columns or one Amount column. */
  function splitCsv(text){const rows=[];let r=[],c='',q=false;text=String(text||'').replace(/^﻿/,'');
@@ -199,6 +245,6 @@ const TP=(()=>{
    depositsTotal:rup(dep.reduce((s,t)=>s+paise(t.amount),0)),paymentsTotal:rup(iss.reduce((s,t)=>s+paise(t.amount),0)),notInBooksTotal:rup(notInBooks.reduce((s,l)=>s+paise(l.amount),0)),
    adjustedBalance:rup(adj),difference:rup(adj-book),reconciled:adj===book};
  }
- return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile,fullName,fyOf,profitAndLoss,balanceSheet,parseStatement,autoMatch,bankRec};
+ return{paise,rup,diff,addDays,BUCKETS,bucketOf,ageing,statement,daily,csv,download,fyStart,natural,side,jno,trialBalance,generalLedger,dayBook,validateJournal,reconcile,fullName,fyOf,profitAndLoss,balanceSheet,parseStatement,autoMatch,bankRec,finStatements};
 })();
 if(typeof module!=='undefined')module.exports=TP;

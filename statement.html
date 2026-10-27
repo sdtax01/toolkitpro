@@ -1,9 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script><script src="assets/reports-lib.js?v=20261024"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script><script src="assets/reports-lib.js?v=20261027"></script></head><body><script>
 const id=Q.get('id');let from=Q.get('from')??TP.fyStart(today()),to=Q.get('to')??today();
 boot('Statement of account',async function render(m){
  const{p,i,t,S}=await load(),x=p.find(y=>y.id===id);
+ const[nq,dq]=await Promise.all([db.from('gst_notes').select('*'),db.from('tds_entries').select('*')]),adjs=[...(nq.error?[]:nq.data||[]).map(n=>({invoice_id:n.invoice_id,date:n.date,amount:n.amount,label:n.kind==='credit'?'Credit note':'Debit note',ref:n.number})),...(dq.error?[]:dq.data||[]).map(d=>({invoice_id:d.invoice_id,date:d.date,amount:d.amount,label:'TDS',ref:d.section||''}))];
  if(!x){m.innerHTML='<div class=card>Contact not found. <a href="customers.html?kind=client">Back to customers</a></div>';return}
- const cust=x.kind==='client',sale=cust?'sale':'purchase',st=TP.statement(x,i,t,from||null,to||null),back='party.html?id='+id+'&kind='+x.kind;
+ const cust=x.kind==='client',sale=cust?'sale':'purchase',st=TP.statement(x,i,t,from||null,to||null,adjs),back='party.html?id='+id+'&kind='+x.kind;
  $('h1').textContent='Statement: '+x.name;
  const card=(k,v,c)=>`<div class=card><div class=k>${k}</div><div class="v ${c||''}">${inr2(v)}</div></div>`;
  m.innerHTML=`<div class=noprint><a href="${back}">← Back to ${cust?'customer':'supplier'}</a></div>

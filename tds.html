@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
+const need=(m,n,what)=>{m.innerHTML=`<div class=card role=status><h3>${what} not installed yet</h3><p>Run <b>${n}</b> from the <code>supabase/migrations</code> folder in the Supabase SQL Editor (after the earlier migrations), then reload. Everything else keeps working without it.</p></div>`};
+const pre=Q.get('invoice')||'';
+boot('TDS Entries',async function render(m){
+ const{i,p}=await load(),dq=await db.from('tds_entries').select('*').order('date',{ascending:false});
+ if(dq.error){if(noTable(dq.error))return need(m,'018_notes_tds_itc.sql','TDS entries');throw dq.error}
+ const D=dq.data||[],pn=id=>(p.find(x=>x.id===id)||{}).name||'',inv=id=>i.find(x=>x.id===id)||{};
+ const open=i.filter(x=>paise(x.amount)-paise(x.paid)-paise(x.adjusted)>0).sort((a,b)=>a.date<b.date?1:-1),sel=open.find(x=>x.id===pre)||open[0];
+ m.innerHTML=`<div class=card><h3>Record TDS</h3><p class=k>Use this when TDS was <b>deducted</b> from a payment: a customer deducted it from what they paid you (becomes <i>TDS receivable</i>), or you deducted it from a supplier (becomes <i>TDS payable</i>; deposit it later with a Transaction in category <b>TDS deposited</b>). Enter the amount and section as on the deduction certificate or challan; no rate is assumed. Record the bank receipt/payment separately for the net amount. Confirm sections and rates with your CA.</p>
+ ${open.length?`<form id=f class=g2><label class=full>Invoice / bill<select name=invoice_id required>${open.map(x=>`<option value="${x.id}" ${sel&&x.id===sel.id?'selected':''}>${esc(x.number)} · ${esc(pn(x.party_id))} · due ${inr2(rup(paise(x.amount)-paise(x.paid)-paise(x.adjusted)))}</option>`).join('')}</select></label>
+ <label>Date<input type=date name=date value="${today()}" required></label><label>TDS amount (₹)<input name=amount type=number min=0.01 step=0.01 required></label><label>Section<input name=section placeholder="e.g. 194C"></label><label>Note<input name=note></label>
+ <div class="f2 full"><button>Save TDS entry</button></div></form>`:'<p class=up>No open invoices or bills.</p>'}</div>
+ <div class=card><h3>TDS entries</h3><table><tr><th>Date<th>Document<th>Party<th>Type<th>Section<th class=r>Amount<th></tr>${D.map(d=>`<tr><td>${d.date}<td><a href="invoice.html?id=${d.invoice_id}&kind=${inv(d.invoice_id).kind||'sale'}">${esc(inv(d.invoice_id).number||'')}</a><td>${esc(pn(inv(d.invoice_id).party_id))}<td>${inv(d.invoice_id).kind==='sale'?'Receivable (deducted by customer)':'Payable (deducted by us)'}<td>${esc(d.section||'')}<td class=r>${inr2(d.amount)}<td><button class=x data-id="${d.id}">Delete</button></tr>`).join('')||'<tr><td colspan=7>No TDS entries yet.</tr>'}</table></div>`;
+ if($('#f')){const f=$('#f');f.onsubmit=ev=>{ev.preventDefault();return guard(f,async()=>{const e=f.elements;if(await lockedBlock(e.date.value))return;
+  const r=await db.from('tds_entries').insert({invoice_id:e.invoice_id.value,date:e.date.value,amount:rup(paise(e.amount.value)),section:e.section.value.trim()||null,note:e.note.value.trim()||null});
+  if(r.error)return alert(r.error.message);toast('TDS entry saved');history.replaceState(null,'','tds.html');render(m)})}}
+ m.querySelectorAll('.x[data-id]').forEach(b=>b.onclick=async()=>{const d=D.find(y=>y.id===b.dataset.id);if(!confirm('Delete this TDS entry? Its ledger entry is reversed.'))return;if(await lockedBlock(d.date))return;if(await ok(db.from('tds_entries').delete().eq('id',d.id)))render(m)});
+},'tds.html');
+</script></body></html>

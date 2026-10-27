@@ -1,10 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
 let ym=today().slice(0,7);
 boot('Calendar',async function render(m){
  const{r,i}=await load(),[Y,M]=ym.split('-').map(Number),first=new Date(Date.UTC(Y,M-1,1)).getUTCDay(),n=new Date(Date.UTC(Y,M,0)).getUTCDate(),ev={};
  const add=(d,t,c)=>(ev[d]=ev[d]||[]).push([t,c]);
  r.filter(x=>!x.done).forEach(x=>add(x.due_date,x.title,''));
- i.filter(x=>x.amount-x.paid>0&&x.due_date).forEach(x=>add(x.due_date,(x.kind==='sale'?'Collect ':'Pay ')+x.number,x.kind==='sale'?'up':'dn'));
+ i.filter(x=>x.amount-x.paid-(+x.adjusted||0)>0&&x.due_date).forEach(x=>add(x.due_date,(x.kind==='sale'?'Collect ':'Pay ')+x.number,x.kind==='sale'?'up':'dn'));
  add(ym+'-11','GSTR-1 due','k');add(ym+'-20','GSTR-3B due','k');
  const cells=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class=h>${d}</div>`).join('')+'<div></div>'.repeat(first)+[...Array(n)].map((_,k)=>{const d=ym+'-'+String(k+1).padStart(2,'0');return`<div><b>${k+1}</b>${(ev[d]||[]).map(e=>`<p class="${e[1]}">${esc(e[0])}</p>`).join('')}</div>`}).join('');
  m.innerHTML=`<div><button class=g id=pv>Previous</button> <b>${ym}</b> <button class=g id=nx>Next</button></div><div class=card><div class=cal>${cells}</div></div>`;

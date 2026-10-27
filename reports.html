@@ -1,10 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261024"><script src="assets/vendor/supabase.js?v=20261024"></script><script src="assets/app.js?v=20261024"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261027"><script src="assets/vendor/supabase.js?v=20261027"></script><script src="assets/app.js?v=20261027"></script></head><body><script>
 let yr=today().slice(0,4);
 boot('Reports',async function render(m){
  const{t,i}=await load(),yt=t.filter(x=>x.date.startsWith(yr)),M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
  const rows=M.map((n,k)=>{const l=yt.filter(x=>x.date.startsWith(yr+'-'+String(k+1).padStart(2,'0')));return[n,sum(l,'income'),sum(l,'expense')]});
  const cat=ty=>{const o={};yt.filter(x=>x.type===ty).forEach(x=>{const k=x.category||'Others';o[k]=(o[k]||0)+ +x.amount});return Object.entries(o).sort((p,q)=>q[1]-p[1])};
- const ag=k=>{const l=i.filter(x=>x.kind===k&&x.amount-x.paid>0);const s=f=>l.filter(f).reduce((a,x)=>a+x.amount-x.paid,0);return[s(x=>!x.due_date||days(x.due_date)>=0),s(x=>x.due_date&&days(x.due_date)<0)]};
+ const ag=k=>{const l=i.filter(x=>x.kind===k&&x.amount-x.paid-(+x.adjusted||0)>0);const s=f=>l.filter(f).reduce((a,x)=>a+x.amount-x.paid-(+x.adjusted||0),0);return[s(x=>!x.due_date||days(x.due_date)>=0),s(x=>x.due_date&&days(x.due_date)<0)]};
  const li=l=>l.map(x=>`<tr><td>${esc(x[0])}<td class=r>${inr(x[1])}</tr>`).join('')||'<tr><td>None</tr>';
  m.innerHTML=`<div><input type=number id=yr value="${yr}" min=2000 max=2100> <button class=g id=csv>Export CSV</button></div>
  <div class=card><h3>Profit & Loss, ${yr}</h3><table><tr><th>Month<th class=r>Income<th class=r>Expenses<th class=r>Profit</tr>${rows.map(r=>`<tr><td>${r[0]}<td class=r>${inr(r[1])}<td class=r>${inr(r[2])}<td class="r ${r[1]>=r[2]?'up':'dn'}">${inr(r[1]-r[2])}</tr>`).join('')}<tr><td><b>Total</b><td class=r><b>${inr(sum(yt,'income'))}</b><td class=r><b>${inr(sum(yt,'expense'))}</b><td class=r><b>${inr(sum(yt,'income')-sum(yt,'expense'))}</b></tr></table></div>
