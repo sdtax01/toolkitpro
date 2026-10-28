@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path');
+const root=path.join(__dirname,'..');
+const html=fs.readFileSync(path.join(root,'banking.html'),'utf8');
+const app=fs.readFileSync(path.join(root,'assets/app.js'),'utf8');
+const sql=fs.readFileSync(path.join(root,'supabase/migrations/019_banking_engine.sql'),'utf8');
+let bad=0;const ok=(v,m)=>{console.log((v?'PASS ':'FAIL ')+m);if(!v)bad++};
+ok(/Advance from Customer/.test(html),'receipt form offers customer advances');
+ok(/Receipt against Sale Invoice/.test(html),'receipt form offers sales invoice receipts');
+ok(/Other Income/.test(html)&&/TDS Refund/.test(html)&&/Interest Income/.test(html),'other income supports interest and TDS refunds');
+ok(/Advance Payment to Supplier/.test(html),'payment form offers supplier advances');
+ok(/Payment Against Bills/.test(html),'payment form offers bill payments');
+ok(/Late Fees \/ Penalty/.test(html)&&/Interest/.test(html),'other payments support interest and penalties');
+ok(/record_payment/.test(html)&&/p_invoice:inv.id/.test(html),'invoice-linked entries use the existing atomic payment function');
+ok(/party_id:partyId/.test(html),'advance entries retain their selected party');
+ok(/customer_advances/.test(sql)&&/supplier_advances/.test(sql),'advance postings use dedicated liability and asset accounts');
+ok(/tds refund/i.test(sql)&&/tds_receivable/.test(sql),'TDS refunds reduce TDS receivable');
+ok(!/\['Income & Receipts','transactions\.html\?type=income'\]/.test(app)&&!/\['Expenses & Payments','transactions\.html\?type=expense'\]/.test(app),'old income/expense shortcuts are removed from the sidebar');
+console.log(bad?`\n${bad} banking check(s) failed`:'\nAll Banking checks passed');process.exit(bad?1:0);
