@@ -20,7 +20,7 @@ const NAV=[
  {g:'tax',t:'Tax & Compliance',i:'tax',c:[['GST & Taxes','taxes.html'],['Credit / Debit Notes','notes.html'],['TDS Entries','tds.html'],['Documents & Uploads','documents.html'],['Compliance Calendar','calendar.html'],['Reminders','reminders.html']]},
  {g:'reports',t:'Reports & Insights',i:'reports',c:[['Reports Dashboard','reports.html'],['Income & Expense Analysis','reports.html#income-expense'],['Receivables & Payables','reports.html#receivables-payables'],['Monthly / Financial Year Analysis','reports.html#monthly'],['Business Overview','overview.html'],['Daily Summary','daily.html']]},
  {g:'books',t:'Books of Accounts',i:'books',c:[['Trial Balance','trial-balance.html'],['General Ledger','ledger.html'],['Cash Book','ledger.html?book=cash'],['Day Book','daybook.html'],['Journal Entry (Manual Posting)','journal-new.html'],['Profit & Loss','profit-loss.html'],['Balance Sheet','balance-sheet.html'],['Financial Statements (Schedule III)','statements.html',[['Balance Sheet','statements.html#sch-bs'],['Statement of Profit and Loss','statements.html#sch-pl'],['Cash Flow Statement','statements.html#sch-cf']]],['Year-end Review','year-end.html'],['Chart of Accounts','coa.html'],['Ledger Setup','ledger-setup.html']]},
- {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Ledger Preferences','ledger-setup.html#prefs'],['Application Settings','settings.html#app']]}
+ {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Ledger Preferences','ledger-setup.html#prefs'],['Application Settings','settings.html#app'],['Voice Assistant','settings.html#voice']]}
 ];
 /* Detail pages belong to a menu item: party.html is a customer/supplier, invoice.html and invoice-new.html are a sales invoice/purchase bill. */
 const navAlias=(f,q)=>f==='party.html'?['customers.html',{kind:q.kind==='supplier'?'supplier':'client'}]:(f==='invoice.html'||f==='invoice-new.html')?['invoices.html',{kind:q.kind==='purchase'?'purchase':'sale'}]:f==='statement.html'?['statement.html',{kind:q.kind==='supplier'?'supplier':'client'}]:[f,q];
@@ -192,6 +192,8 @@ function login(){
  $('#si').addEventListener('pointerdown',ev=>{if(rm||$('#si').disabled)return;const b=$('#si'),r=b.getBoundingClientRect(),d=document.createElement('i');d.className='rip';d.style.cssText='left:'+(ev.clientX-r.left)+'px;top:'+(ev.clientY-r.top)+'px';b.appendChild(d);setTimeout(()=>d.remove(),700)});
  form.addEventListener('input',()=>{if(msg.classList.contains('er'))say('')});
  $('#e').focus()}
+/* Voice assistant: loaded on every signed-in page (microphone button at the bottom right). Safe to call twice. */
+let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261028').then(()=>add('assets/voice.js?v=20261028')).then(res)}));
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const file=location.pathname.split('/').pop()||'index.html',Qo=Object.fromEntries(Q),fb=act||file+location.search,nowOn=()=>navFind(file,Qo,location.hash,fb),on=nowOn();
@@ -209,4 +211,4 @@ async function boot(title,render,act){
  $('#out').onclick=async()=>{await db.auth.signOut();location.reload()};
  const side=async()=>{const{S}=await load();if(S.business_name)$('#who').textContent=S.business_name};
  let first=1;const run=async()=>{try{LP=load0();const sp=side().catch(()=>{});await render($('#main'));await sp;if(first){first=0;try{const h=location.hash.slice(1),t=h&&document.getElementById(decodeURIComponent(h));if(t)t.scrollIntoView()}catch(_){}}}catch(e){$('#main').innerHTML='<div class="card dn" role="alert">Could not load data: '+esc(e.message)+'. Check the Supabase keys and that the SQL has been run. <button class=g id=retry>Retry</button></div>';const rb=$('#retry');if(rb)rb.onclick=()=>{$('#main').innerHTML=SKEL;run()}}finally{LP=null;const mm=$('#main');if(mm)mm.setAttribute('aria-busy','false')}};
- window.refresh=run;await run();let rt;db.channel('live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(run,400)}).subscribe();}
+ window.refresh=run;await run();loadVoice();let rt;db.channel('live').on('postgres_changes',{event:'*',schema:'public'},()=>{clearTimeout(rt);rt=setTimeout(run,400)}).subscribe();}
