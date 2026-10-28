@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Banking | Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Banking | Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261029"><script src="assets/vendor/supabase.js?v=20261029"></script><script src="assets/app.js?v=20261029"></script></head><body><script>
 boot('Banking',async m=>{
  const [A,T,P,I]=await Promise.all([
   db.from('accounts').select('*').order('name'),
@@ -8,7 +8,7 @@ boot('Banking',async m=>{
  ]);
  for(const r of [A,T,P,I])if(r.error){m.innerHTML=`<div class=card><h3>Banking could not load</h3><p>${esc(r.error.message)}</p><p>Check the Supabase schema and access policies.</p></div>`;return}
  const a=A.data||[],t=T.data||[],p=P.data||[],i=I.data||[];
- let mode='receipt';
+ let mode=new URLSearchParams(location.search).get('mode')==='payment'?'payment':'receipt';
  const balRows=bal(a,t);
  const money=n=>inr2(n);
  const partyOptions=kind=>p.filter(x=>x.kind===kind).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');

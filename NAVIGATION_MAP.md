@@ -59,7 +59,6 @@ Items with a `#section` jump to a card on an existing page. They are views of th
 | | Ledger Setup | `ledger-setup.html` |
 | **Settings** | Company Profile | `settings.html#company` |
 | | Business & GST Details | `settings.html#gst` |
-| | Ledger Preferences | `ledger-setup.html#prefs` (period lock and safety switches) |
 | | Application Settings | `settings.html#app` (email test) |
 
 ## Requested items that are not in the menu, and why
