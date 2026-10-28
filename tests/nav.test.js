@@ -41,10 +41,10 @@ const T=[['index.html','',''  ,'index.html'],['','', '','index.html'],
  ['notes.html','kind=credit','','notes.html?kind=credit'],['notes.html','kind=debit','','notes.html?kind=debit'],['notes.html','','','notes.html'],['notes.html','invoice=9','','notes.html'],
  ['transactions.html','','','transactions.html'],['transactions.html','type=income','','transactions.html'],['transactions.html','type=expense','','transactions.html'],
  ['ledger.html','','','ledger.html'],['ledger.html','acc=5&from=2026-04-01','','ledger.html'],['ledger.html','book=cash','','ledger.html?book=cash'],
- ['reports.html','','','reports.html'],['reports.html','','#monthly','reports.html#monthly'],['reports.html','','#income-expense','reports.html#income-expense'],['reports.html','','#receivables-payables','reports.html#receivables-payables'],['reports.html','','#main','reports.html'],
+ ['reports.html','','','reports.html'],['reports.html','','#monthly','reports.html#monthly'],['reports.html','','#income-expense','reports.html'],['reports.html','','#receivables-payables','reports.html'],['reports.html','','#main','reports.html'],
  ['statements.html','','','statements.html'],['statements.html','','#sch-bs','statements.html#sch-bs'],['statements.html','','#sch-pl','statements.html#sch-pl'],['statements.html','','#sch-cf','statements.html#sch-cf'],
  ['settings.html','','#company','settings.html#company'],['settings.html','','#gst','settings.html#gst'],['settings.html','','#app','settings.html#app'],['settings.html','','','settings.html#company'],
- ['ledger-setup.html','','','ledger-setup.html'],['ledger-setup.html','','#prefs','ledger-setup.html#prefs'],
+ ['ledger-setup.html','','','ledger-setup.html'],['ledger-setup.html','','#prefs','ledger-setup.html'],
  ['balance-sheet.html','asof=2026-03-31','','balance-sheet.html'],['profit-loss.html','from=2026-04-01&to=2026-10-27','','profit-loss.html'],['trial-balance.html','asof=2026-03-31','','trial-balance.html'],
  ['bank-rec.html','acc=1','','bank-rec.html'],['daily.html','d=2026-10-01','','daily.html'],['overview.html','','','overview.html'],['year-end.html','fy=2026-04-01','','year-end.html']];
 for(const[f,q,h,want]of T){const got=ctx.navFind(f,Object.fromEntries(new URLSearchParams(q)),h,null);
