@@ -1,10 +1,80 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script></head><body><script>
-boot('Banking & Accounts',async m=>{
- const{a,t}=await load(),b=bal(a,t);
- m.innerHTML=`<div class=card><h3>Add account</h3><form class=f id=f><input name=name placeholder="Account name (e.g. HDFC Bank)" required><input name=opening type=number step=0.01 placeholder="Opening balance (₹)" value=0><button>Save account</button></form></div>
- <div class=card><table><tr><th>Account<th class=r>Opening<th class=r>Inflows<th class=r>Outflows<th class=r>Balance<th></tr>${b.map(x=>`<tr><td>${esc(x.name)}<td class=r>${inr(x.opening)}<td class="r up">${inr(x.inc)}<td class="r dn">${inr(x.exp)}<td class=r><b>${inr(x.bal)}</b><td><button class=g data-e="${x.id}">Edit</button><button class=x data-id="${x.id}">Delete</button></tr>`).join('')||'<tr><td colspan=6>No accounts yet.</tr>'}<tr><td colspan=4><b>Total</b><td class=r><b>${inr(b.reduce((s,x)=>s+x.bal,0))}</b><td></tr></table></div>`;
- $('#f').onsubmit=async e=>{e.preventDefault();const d=Object.fromEntries(new FormData($('#f')));if(await ok(db.from('accounts').insert({name:d.name,opening:+d.opening||0}))){$('#f').reset();refresh()}};
- m.querySelectorAll('[data-e]').forEach(x=>x.onclick=()=>editBox('Edit account',[{n:'name',l:'Account name',req:1,full:1},{n:'opening',l:'Opening balance (₹)',t:'number',step:'0.01',full:1}],a.find(y=>y.id===x.dataset.e),d=>ok(db.from('accounts').update({name:d.name,opening:+d.opening||0}).eq('id',x.dataset.e))).then(()=>refresh()));
- m.querySelectorAll('.x').forEach(x=>x.onclick=async()=>{if(confirm('Delete this account? Its transactions stay but become unassigned.')&&await ok(db.from('accounts').delete().eq('id',x.dataset.id)))refresh()});
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Banking | Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script></head><body><script>
+boot('Banking',async m=>{
+ const [A,T,P,I]=await Promise.all([
+  db.from('accounts').select('*').order('name'),
+  db.from('transactions').select('*,accounts(name)').order('date',{ascending:false}),
+  db.from('parties').select('*').order('name'),
+  db.from('invoices').select('*').order('date',{ascending:false})
+ ]);
+ for(const r of [A,T,P,I])if(r.error){m.innerHTML=`<div class=card><h3>Banking could not load</h3><p>${esc(r.error.message)}</p><p>Check the Supabase schema and access policies.</p></div>`;return}
+ const a=A.data||[],t=T.data||[],p=P.data||[],i=I.data||[];
+ let mode='receipt';
+ const balRows=bal(a,t);
+ const money=n=>inr2(n);
+ const partyOptions=kind=>p.filter(x=>x.kind===kind).map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+ const invoiceOptions=kind=>i.filter(x=>x.kind===kind&&paise(+x.amount)-paise(+x.paid)-paise(+x.adjusted)>0).map(x=>`<option value="${x.id}">${esc(x.number)} — ${esc(p.find(y=>y.id===x.party_id)?.name||'Party')} · Due ${money(Math.max(0,+x.amount-(+x.paid||0)-(+x.adjusted||0)))}</option>`).join('');
+ const receiptTypes=[['advance_customer','Advance from Customer'],['sale_invoice','Receipt against Sale Invoice'],['other_income','Other Income']];
+ const paymentTypes=[['advance_supplier','Advance Payment to Supplier'],['purchase_bill','Payment Against Bills'],['other_expense','Others']];
+ const options=()=> (mode==='receipt'?receiptTypes:paymentTypes).map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+ const renderForm=()=>{
+  const sub=$('#subtype')?.value||(mode==='receipt'?'advance_customer':'advance_supplier');
+  let extra='';
+  if(sub==='advance_customer')extra=`<label>Customer<select name="party_id" required><option value="">Select customer</option>${partyOptions('client')}</select></label>`;
+  if(sub==='sale_invoice')extra=`<label class=full>Sales Invoice<select name="invoice_id" id="invoice_id" required><option value="">Select unpaid sales invoice</option>${invoiceOptions('sale')}</select></label><p class="k full" id="invoice_hint">Select an invoice to see its customer and outstanding balance.</p>`;
+  if(sub==='advance_supplier')extra=`<label>Supplier<select name="party_id" required><option value="">Select supplier</option>${partyOptions('supplier')}</select></label>`;
+  if(sub==='purchase_bill')extra=`<label class=full>Purchase Bill<select name="invoice_id" id="invoice_id" required><option value="">Select unpaid purchase bill</option>${invoiceOptions('purchase')}</select></label><p class="k full" id="invoice_hint">Select a bill to see its supplier and outstanding balance.</p>`;
+  if(sub==='other_income')extra=`<label>Income type<select name="other_type" id="other_type"><option value="Interest Income">Interest Income</option><option value="TDS Refund">TDS Refund</option><option value="Others">Others</option></select></label><label id="other_label" hidden>Income category<input name="other_category" placeholder="e.g. Commission received"></label>`;
+  if(sub==='other_expense')extra=`<label>Payment type<select name="other_type" id="other_type"><option value="Interest">Interest</option><option value="Late Fees / Penalty">Late fees / penalty</option><option value="Others">Others</option></select></label><label id="other_label" hidden>Expense category<input name="other_category" placeholder="e.g. Bank charges"></label>`;
+  $('#dynamic-fields').innerHTML=extra;
+  const ot=$('#other_type');if(ot)ot.onchange=()=>{const other=ot.value==='Others';$('#other_label').hidden=!other;const inp=$('#other_label input');if(inp)inp.required=other};
+  const inv=$('#invoice_id');if(inv)inv.onchange=()=>showInvoiceHint(inv.value,sub);
+ };
+ const showInvoiceHint=(id,sub)=>{const hint=$('#invoice_hint');if(!hint)return;const x=i.find(z=>z.id===id);if(!x){hint.textContent='Select an invoice to see its party and outstanding balance.';return}const party=p.find(z=>z.id===x.party_id);hint.textContent=`${sub==='sale_invoice'?'Customer':'Supplier'}: ${party?.name||'Unknown'} · Invoice total ${money(x.amount)} · Already settled ${money((+x.paid||0)+(+x.adjusted||0))} · Balance ${money(Math.max(0,+x.amount-(+x.paid||0)-(+x.adjusted||0)))}`;$('#amount').max=Math.max(0,+x.amount-(+x.paid||0)-(+x.adjusted||0));$('#amount').value=$('#amount').max};
+ const render=()=>{
+  m.innerHTML=`
+   <div class="card"><div class="f2"><button type=button id=receiptTab class="${mode==='receipt'?'':'g'}">↓ Record Receipt</button><button type=button id=paymentTab class="${mode==='payment'?'':'g'}">↑ Record Payment</button></div><p class=k>Record every money received or paid from one place. Invoice-linked entries update outstanding balances automatically.</p>
+    <form class="f g2" id="entryForm">
+     <label>Entry date<input type=date name=date value="${today()}" required></label>
+     <label>Entry type<select name=subtype id=subtype>${options()}</select></label>
+     <div id="dynamic-fields" class="g2 full"></div>
+     <label>Cash / Bank account<select name=account_id required><option value="">Select account</option>${a.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></label>
+     <label>Amount (₹)<input id=amount name=amount type=number min="0.01" step="0.01" placeholder="0.00" required></label>
+     <label class=full>Description / narration<input name=description placeholder="Purpose, reference or narration" required></label>
+     <label class=full>Reference number (optional)<input name=reference_no placeholder="UTR / cheque / transaction reference"></label>
+     <div class="f2 full"><button id=saveEntry>Save ${mode==='receipt'?'Receipt':'Payment'}</button></div>
+    </form>
+   </div>
+   <div class=card><div class="f2"><h3>Recent receipts & payments</h3><span class=k>All entries, including invoice-linked receipts/payments</span></div><div class=tablewrap><table><tr><th>Date</th><th>Details</th><th>Category</th><th>Type</th><th>Account</th><th class=r>Amount</th><th></th></tr>${t.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.description)}${x.invoice_id?`<br><span class=k>Linked invoice/bill</span>`:''}</td><td>${esc(x.category||'')}</td><td><span class="bd ${x.type==='income'?'ok':'od'}">${x.type==='income'?'Receipt':'Payment'}</span></td><td>${esc(x.accounts?.name||a.find(y=>y.id===x.account_id)?.name||'—')}</td><td class="r ${x.type==='income'?'up':'dn'}">${x.type==='expense'?'-':''}${money(x.amount)}</td><td>${x.invoice_id?`<a class=btn href="invoice.html?id=${x.invoice_id}&kind=${i.find(y=>y.id===x.invoice_id)?.kind==='purchase'?'purchase':'sale'}">Open</a>`:`<button type=button class=x data-delete="${x.id}">Delete</button>`}</td></tr>`).join('')||'<tr><td colspan=7>No receipts or payments recorded yet.</td></tr>'}</table></div></div>
+   <div class=card><h3>Cash & bank balances</h3><form class=f id=accountForm><input name=name placeholder="Account name (e.g. HDFC Bank / Cash in Hand)" required><input name=opening type=number step=0.01 placeholder="Opening balance (₹)" value=0><button>+ Add account</button></form><div class=tablewrap><table><tr><th>Account</th><th class=r>Opening</th><th class=r>Inflows</th><th class=r>Outflows</th><th class=r>Balance</th><th></th></tr>${balRows.map(x=>`<tr><td>${esc(x.name)}</td><td class=r>${money(x.opening)}</td><td class="r up">${money(x.inc)}</td><td class="r dn">${money(x.exp)}</td><td class=r><b>${money(x.bal)}</b></td><td><button type=button class=g data-edit-account="${x.id}">Edit</button></td></tr>`).join('')||'<tr><td colspan=6>No accounts created.</td></tr>'}<tr><td colspan=4><b>Total</b></td><td class=r><b>${money(balRows.reduce((s,x)=>s+x.bal,0))}</b></td><td></td></tr></table></div></div>`;
+  $('#receiptTab').onclick=()=>{mode='receipt';render()};$('#paymentTab').onclick=()=>{mode='payment';render()};$('#subtype').onchange=renderForm;renderForm();
+  $('#entryForm').onsubmit=e=>{e.preventDefault();const f=$('#entryForm');return guard(f,async()=>{
+   const d=Object.fromEntries(new FormData(f)),sub=d.subtype,amt=rup(paise(d.amount));if(!(amt>0))return alert('Enter an amount greater than zero.');if(await lockedBlock(d.date))return;
+   const isReceipt=mode==='receipt';let type=isReceipt?'income':'expense',category='',partyId=d.party_id||null,invoiceId=d.invoice_id||null,description=d.description.trim();
+   if(sub==='advance_customer')category='Advance received';
+   else if(sub==='sale_invoice')category='Sales';
+   else if(sub==='advance_supplier')category='Advance paid';
+   else if(sub==='purchase_bill')category='Purchases';
+   else if(sub==='other_income')category=d.other_type==='Others'?(d.other_category||'').trim():d.other_type;
+   else if(sub==='other_expense')category=d.other_type==='Others'?(d.other_category||'').trim():d.other_type;
+   if((sub==='other_income'||sub==='other_expense')&&!category)return alert('Enter a category for Others.');
+   if(invoiceId){const inv=i.find(x=>x.id===invoiceId);if(!inv)return alert('Selected invoice or bill was not found.');const outstanding=rup(paise(inv.amount)-paise(inv.paid)-paise(inv.adjusted));if(paise(amt)>paise(outstanding))return alert('Amount exceeds the outstanding balance of '+money(outstanding)+'.');if((sub==='sale_invoice'&&inv.kind!=='sale')||(sub==='purchase_bill'&&inv.kind!=='purchase'))return alert('Select the correct invoice/bill type.');const party=p.find(x=>x.id===inv.party_id);description=(description|| (isReceipt?'Receipt against ':'Payment against '))+`${inv.number}${party?' - '+party.name:''}`;
+    const rp=await db.rpc('record_payment',{p_invoice:inv.id,p_amount:amt,p_date:d.date,p_account:d.account_id,p_description:description});
+    if(!rp.error){toast(isReceipt?'Receipt recorded and invoice updated.':'Payment recorded and bill updated.');location.reload();return}
+    if(!noFn(rp.error)){alert(rp.error.message);return}
+    const ins=await db.from('transactions').insert({date:d.date,description,category,type,amount:amt,account_id:d.account_id,invoice_id:inv.id}).select().single();if(ins.error)return alert(ins.error.message);
+    const upd=await db.from('invoices').update({paid:rup(paise(inv.paid)+paise(amt))}).eq('id',inv.id);if(upd.error){await db.from('transactions').delete().eq('id',ins.data.id);return alert(upd.error.message)}
+   }else{
+    const partyName=partyId?p.find(x=>x.id===partyId)?.name:null;if((sub==='advance_customer'&&!partyId)||(sub==='advance_supplier'&&!partyId))return alert('Select the customer or supplier.');
+    if(partyName&&!description)description=(isReceipt?'Advance received from ':'Advance paid to ')+partyName;
+    const row={date:d.date,description,category,type,amount:amt,account_id:d.account_id,party_id:partyId,reference_no:d.reference_no||null};
+    const ins=await db.from('transactions').insert(row);if(ins.error){if(/party_id|reference_no|column/i.test(ins.error.message))alert('Run the Banking Engine database migration 019_banking_engine.sql in Supabase, then try again.\n\n'+ins.error.message);else alert(ins.error.message);return}
+   }
+   toast(isReceipt?'Receipt saved.':'Payment saved.');location.reload();
+  })};
+  $('#accountForm').onsubmit=e=>{e.preventDefault();return guard($('#accountForm'),async()=>{const d=Object.fromEntries(new FormData($('#accountForm')));if(await ok(db.from('accounts').insert({name:d.name,opening:+d.opening||0}))){toast('Account added');location.reload()}})};
+  m.querySelectorAll('[data-delete]').forEach(b=>b.onclick=async()=>{const x=t.find(y=>y.id===b.dataset.delete);if(!x||!confirm('Delete this non-invoice-linked entry?'))return;if(await lockedBlock(x.date))return;if(await ok(db.from('transactions').delete().eq('id',x.id)))location.reload()});
+  m.querySelectorAll('[data-edit-account]').forEach(b=>b.onclick=()=>{const x=a.find(y=>y.id===b.dataset.editAccount);editBox('Edit account',[{n:'name',l:'Account name',req:1,full:1},{n:'opening',l:'Opening balance (₹)',t:'number',step:'0.01',full:1}],x,d=>ok(db.from('accounts').update({name:d.name,opening:+d.opening||0}).eq('id',x.id))).then(()=>location.reload())});
+ };
+ render();
 });
 </script></body></html>

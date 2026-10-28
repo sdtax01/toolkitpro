@@ -12,7 +12,7 @@ let bad=0;const ok=(c,msg)=>{console.log((c?'PASS ':'FAIL ')+msg);if(!c)bad++};
 const leaves=ctx.navLeaves();
 const ids=f=>{const s=fs.readFileSync(path.join(root,f),'utf8');return new Set([...s.matchAll(/\bid=["']?([A-Za-z][\w-]*)/g)].map(x=>x[1]))};
 
-ok(leaves.length>=50,'menu has '+leaves.length+' items');
+ok(leaves.length>=45,'menu has '+leaves.length+' items');
 const seen=new Set();let dup=[];leaves.forEach(([l,h])=>{if(seen.has(h))dup.push(h);seen.add(h)});ok(!dup.length,'no duplicate menu hrefs'+(dup.length?': '+dup:''));
 let miss=[],badAnchor=[],abs=[];
 for(const[l,h]of leaves){const[p,hs]=h.split('#'),f=p.split('?')[0];
@@ -24,8 +24,10 @@ ok(!miss.length,'every menu item points at an existing page'+(miss.length?': '+m
 ok(!badAnchor.length,'every #section link has a matching id on its page'+(badAnchor.length?': '+badAnchor:''));
 
 // query parameters that other pages depend on must survive exactly
-for(const h of ['customers.html?kind=client','customers.html?kind=supplier','invoices.html?kind=sale','invoices.html?kind=purchase','ageing.html?kind=sale','ageing.html?kind=purchase','ledger.html?book=cash','transactions.html?type=income','transactions.html?type=expense'])
+for(const h of ['customers.html?kind=client','customers.html?kind=supplier','invoices.html?kind=sale','invoices.html?kind=purchase','ageing.html?kind=sale','ageing.html?kind=purchase','ledger.html?book=cash'])
  ok(seen.has(h),'menu keeps '+h);
+ok(seen.has('banking.html'),'menu has unified Banking entry point');
+ok(!seen.has('transactions.html?type=income')&&!seen.has('transactions.html?type=expense'),'legacy income/expense shortcuts are removed from navigation');
 
 // Highlighting: [page file, query, hash] -> expected active menu href
 const T=[['index.html','',''  ,'index.html'],['','', '','index.html'],
@@ -37,7 +39,7 @@ const T=[['index.html','',''  ,'index.html'],['','', '','index.html'],
  ['ageing.html','kind=sale','','ageing.html?kind=sale'],['ageing.html','kind=purchase','','ageing.html?kind=purchase'],
  ['statement.html','kind=client','','statement.html?kind=client'],['statement.html','id=1&kind=supplier','','statement.html?kind=supplier'],['statement.html','id=1','','statement.html?kind=client'],
  ['notes.html','kind=credit','','notes.html?kind=credit'],['notes.html','kind=debit','','notes.html?kind=debit'],['notes.html','','','notes.html'],['notes.html','invoice=9','','notes.html'],
- ['transactions.html','','','transactions.html'],['transactions.html','type=income','','transactions.html?type=income'],['transactions.html','type=expense','','transactions.html?type=expense'],
+ ['transactions.html','','','transactions.html'],['transactions.html','type=income','','transactions.html'],['transactions.html','type=expense','','transactions.html'],
  ['ledger.html','','','ledger.html'],['ledger.html','acc=5&from=2026-04-01','','ledger.html'],['ledger.html','book=cash','','ledger.html?book=cash'],
  ['reports.html','','','reports.html'],['reports.html','','#monthly','reports.html#monthly'],['reports.html','','#income-expense','reports.html#income-expense'],['reports.html','','#receivables-payables','reports.html#receivables-payables'],['reports.html','','#main','reports.html'],
  ['statements.html','','','statements.html'],['statements.html','','#sch-bs','statements.html#sch-bs'],['statements.html','','#sch-pl','statements.html#sch-pl'],['statements.html','','#sch-cf','statements.html#sch-cf'],

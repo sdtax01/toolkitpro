@@ -70,3 +70,12 @@ Everything here is optional and additive. Run in order in the Supabase SQL Edito
 - Front-end changes: GST rates now include 3% and 40% (12% and 28% remain for old documents); CGST and SGST are always equal (each half rounded to the paisa); intra/inter-state is decided by the GSTIN state codes when both GSTINs are valid, otherwise by State names as before; GSTIN gets a format and check-digit test that asks for confirmation but never blocks.
 - Tests: `node tests/phase4.test.js [ledger_dump.json]`, `node tests/gst.test.js`, and `tests/sql/phase4a_test.sql`, `phase4b_test.sql`, `phase4c_test.sql`, `undo_test.sql`, `phase2_with_phase4_test.sql` (all installed together on top of the Phase 2 tests).
 - Not covered yet (needs professional input or more design): HSN/SAC and line items, reverse charge, e-invoice/e-way bill, TDS/TCS rate engine and returns, income-tax block depreciation, asset disposal, accrual/prepaid/provision entries, expected credit loss, deferred and current tax, notes to accounts, GSTR-1/3B/2B files. Tax rates, section numbers and thresholds change: have your CA verify every statutory treatment.
+
+## Unified Banking engine (migration 019)
+
+- **Banking** (`banking.html`) is the single entry point for receipts, payments, bank/cash accounts and recent money movements. The old Income & Receipts and Expenses & Payments menu shortcuts are removed; their underlying Transactions data and page remain available for compatibility.
+- Receipts: customer advances, receipts against sales invoices (partial receipts update invoice paid/outstanding), and other income including interest income, TDS refunds and custom categories.
+- Payments: supplier advances, payments against purchase bills (partial payments update bill paid/outstanding), and other payments including interest, late fees/penalties and custom categories.
+- Advance entries retain the selected customer/supplier on the transaction. The ledger posts customer advances to the customer-advance liability and supplier advances to the supplier-advance asset. TDS refunds reduce TDS receivable instead of being counted again as income.
+- Apply `supabase/migrations/019_banking_engine.sql` **after migrations 010–018** to add the transaction party/reference fields and update ledger posting. Test on staging after a database backup. This migration is additive and does not replace invoice payment functions.
+
