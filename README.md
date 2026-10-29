@@ -98,3 +98,14 @@ A microphone button sits at the bottom right of every signed-in page. Tap it and
 - **New fields:** Customers and Suppliers now hold registration type, GSTIN, PAN, address, city, PIN code and a state dropdown (with GST state codes). Settings holds your PAN, city, PIN, bank, UPI, signatory, terms and a default HSN/SAC. Sales invoices hold description, HSN/SAC, quantity, unit, place of supply and reverse charge.
 - Run `supabase/migrations/020_invoice_pdf_fields.sql` once in the Supabase SQL Editor (staging first, after a backup; undo: `supabase/undo/020_invoice_pdf_fields_down.sql`). Until it is run, everything still saves exactly as before and the app tells you the new fields were not stored.
 - New files: `assets/pdf.js`, `assets/gst-fields.js`, `assets/vendor/jspdf.umd.min.js` (jsPDF 2.5.2, MIT) and `assets/vendor/Inter-Regular.ttf`, `Inter-Bold.ttf` (Inter, SIL OFL, Latin subset). Test: `node tests/pdf.test.js`.
+
+### Multi-line invoices (migration 021, run after 020)
+- Run `supabase/migrations/020_invoice_pdf_fields.sql` first, then `021_invoice_items.sql` (Supabase SQL Editor, staging first, after a backup). Undo files are in `supabase/undo/`.
+- Sales invoices can now have several lines, each with its own description, HSN/SAC, quantity, unit, rate, discount and GST rate. Tax is worked out per line; the invoice header carries the sum, so ledger, ageing, reports and notes are unchanged.
+- Saving goes through the `save_sales_invoice` function, which checks that the lines add up to the header and replaces the lines atomically. Existing invoices can be edited (Edit button on the invoice page), subject to the period lock and the existing paid/adjusted rules.
+- Without 021 the page still works with a single line as before; more than one line asks you to run 021.
+- E-invoicing (IRN / QR) is not required for this business and is not produced. The earlier note about confirming this with a CA no longer applies.
+- Test: `psql -f tests/sql/phase5_test.sql` in an empty database.
+
+### Voice: partial party names
+Saying only part of a name ("acme", "zenith") now finds the party if every word you said matches a distinctive word of its name. If several parties share that word, the assistant asks which one.

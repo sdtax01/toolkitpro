@@ -1,8 +1,10 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261030"><script src="assets/vendor/supabase.js?v=20261030"></script><script src="assets/app.js?v=20261030"></script><script src="assets/gst-fields.js?v=20261030"></script></head><body><script>
 const sale=Q.get('kind')==='purchase'?'purchase':'sale',kind=sale==='sale'?'client':'supplier',N=sale==='sale'?'Invoice':'Bill',P1=sale==='sale'?'Customer':'Supplier';
-boot('New '+N,async m=>{
+const EID=sale==='sale'?Q.get('edit'):null;
+boot((EID?'Edit ':'New ')+N,async m=>{
  const H=await loadHeads(sale),{p,i,S}=await load(),ps=p.filter(x=>x.kind===kind),pre=Q.get('party')||'',no=(sale==='sale'?'INV-':'BILL-')+String(i.filter(x=>x.kind===sale).reduce((mx,x)=>Math.max(mx,parseInt(String(x.number).replace(/\D+/g,''),10)||0),i.filter(x=>x.kind===sale).length)+1).padStart(4,'0'),dd=(()=>{const d=new Date();d.setDate(d.getDate()+15);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
  if(!ps.length){m.innerHTML=`<div class=card>Add a ${P1.toLowerCase()} first. <a class=btn href="customers.html?kind=${kind}">Go to ${P1}s</a></div>`;return}
+ if(sale==='sale')return saleForm(m,{H,p,i,S,ps,pre,no,dd});
  m.innerHTML=`<form id=f class="row c21"><div class=card><h3>${N} details</h3><div class=g2>
  <label class=full>${P1}<select name=party_id required><option value="">Select ${P1.toLowerCase()}${ps.map(x=>`<option value="${x.id}" ${x.id===pre?'selected':''}>${esc(x.name)}`).join('')}</select></label>
  <label>${N} number<input name=number value="${no}" required></label><label>${N} date<input type=date name=date value="${today()}" required></label>
@@ -20,4 +22,60 @@ boot('New '+N,async m=>{
   const r=await GF.saveCompat(rw=>db.from('invoices').insert(rw).select().single(),row,GF.INVOICE_NEW);
   if(r.error)return alert(r.error.message);if(r.dropped&&(r.lost||[]).length)alert('Invoice saved, but its description / HSN / quantity details were not stored because migration 020 has not been run in Supabase yet.');location.href='invoice.html?id='+r.data.id+'&kind='+sale})};
 },'invoices.html?kind='+sale);
+/* Sales invoices: any number of lines, each with its own HSN/SAC, quantity, rate, discount and GST rate. The invoice keeps the totals, so ledger, ageing and reports are unchanged. */
+async function saleForm(m,{H,p,i,S,ps,pre,no,dd}){
+ let X=null,XI=[];
+ if(EID){X=i.find(y=>y.id===EID&&y.kind==='sale');if(!X){m.innerHTML='<div class=card>Invoice not found. <a href="invoices.html?kind=sale">Back to list</a></div>';return}
+  const r=await db.from('invoice_items').select('*').eq('invoice_id',EID).order('line_no');XI=r.error?[]:(r.data||[])}
+ const ik=await db.from('invoice_items').select('id').limit(1),ITEMS=!ik.error;
+ const dflt=()=>({description:'',hsn_sac:S.default_hsn||'',quantity:1,unit:'',rate:'',discount:'',gst_rate:S.default_gst??18});
+ let lines=X?(XI.length?XI.map(l=>({description:l.description,hsn_sac:l.hsn_sac||'',quantity:l.quantity,unit:l.unit||'',rate:l.rate,discount:+l.discount||'',gst_rate:l.gst_rate})):[{description:X.description||'',hsn_sac:X.hsn_sac||'',quantity:+X.quantity>0?+X.quantity:1,unit:X.unit||'',rate:+X.quantity>0?+((X.taxable==null?X.amount:X.taxable)/X.quantity).toFixed(4):(X.taxable==null?X.amount:X.taxable),discount:'',gst_rate:X.taxable==null?(S.default_gst??18):X.gst_rate}]):[dflt()];
+ const sel=(a,b)=>String(a)===String(b)?'selected':'';
+ m.innerHTML=`<form id=f><div class=card><h3>${EID?'Edit invoice':'Invoice details'}</h3><div class=g2>
+ <label class=full>Customer<select name=party_id required><option value="">Select customer${ps.map(x=>`<option value="${x.id}" ${x.id===(X?X.party_id:pre)?'selected':''}>${esc(x.name)}`).join('')}</select></label>
+ <label>Invoice number<input name=number value="${esc(X?X.number:no)}" required></label><label>Invoice date<input type=date name=date value="${esc(X?X.date:today())}" required></label>
+ <label>Due date<input type=date name=due_date value="${esc(X?(X.due_date||''):dd)}"></label>
+ <label>Place of supply (if different from customer state)<select name=place_of_supply>${GF.stateOpts(X&&X.place_of_supply).map(o=>`<option value="${esc(o[0])}" ${GF.canonState(X&&X.place_of_supply)===o[0]?'selected':''}>${o[0]?esc(o[1]):'Same as customer state'}</option>`).join('')}</select></label>
+ <label class=full><input type=checkbox name=reverse_charge style="width:auto" ${X&&X.reverse_charge?'checked':''}> Tax payable on reverse charge by the recipient</label>
+ ${H.on?`<label class=full>Income head (Chart of Accounts)<select name=gl_account_id><option value="">Sales (default)${H.heads.map(h=>`<option value="${h.id}" ${sel(X&&X.gl_account_id||'',h.id)}>${esc(h.code+' '+h.label)}`).join('')}</select></label>`:''}</div></div>
+ <div class=card><h3>Items</h3><div id=lines></div><p><button type=button class=g id=addl>+ Add line</button></p>${ITEMS?'':'<p class=k>Several lines need migration 021 in Supabase (supabase/migrations/021_invoice_items.sql). Until then an invoice can have one line.</p>'}</div>
+ <div class=card><h3>Summary</h3><div id=sum></div><p class=k id=pos></p><button>Save Invoice</button> <a class=btn style="background:#eef1fb;color:#14213d" href="${EID?'invoice.html?id='+EID+'&kind=sale':'invoices.html?kind=sale'}">Cancel</a></div></form>`;
+ const f=$('#f'),box=$('#lines'),pt=()=>ps.find(y=>y.id===f.elements.party_id.value);
+ const calc=()=>GF.calcLines(lines,(t,r)=>gst(t,r,S,pt()));
+ const draw=()=>{box.innerHTML=lines.map((l,n)=>`<div class=ln data-i="${n}" style="border:1px solid #d5dbec;border-radius:10px;padding:10px;margin-bottom:10px"><div class=g2>
+  <label class=full>Line ${n+1}: description of goods / services<input data-f=description maxlength=300 value="${esc(l.description)}" placeholder="e.g. GST return filing, October 2026"></label>
+  <label>HSN / SAC<input data-f=hsn_sac inputmode=numeric maxlength=8 value="${esc(l.hsn_sac)}" placeholder="e.g. 998231"></label>
+  <label>GST rate %<select data-f=gst_rate>${RATES.map(r=>`<option ${r==l.gst_rate?'selected':''}>${r}`).join('')}</select></label>
+  <label>Quantity<input data-f=quantity type=number min=0.001 step=any value="${esc(l.quantity)}"></label><label>Unit<input data-f=unit maxlength=12 value="${esc(l.unit)}" placeholder="Nos, Hrs, Kg"></label>
+  <label>Rate (₹)<input data-f=rate type=number min=0 step=any value="${esc(l.rate)}"></label><label>Discount (₹)<input data-f=discount type=number min=0 step=any value="${esc(l.discount)}"></label></div>
+  <div class=f2 style="justify-content:space-between;align-items:center;margin-top:6px"><span class=k data-t></span>${lines.length>1?'<button type=button class=x data-rm>Remove line</button>':''}</div></div>`).join('');upd()};
+ const upd=()=>{const c=calc(),it=c.items;box.querySelectorAll('.ln').forEach((d,n)=>{const t=d.querySelector('[data-t]');if(t&&it[n])t.textContent='Line taxable value: '+inr2(it[n].taxable)});
+  const rows=[...new Set(it.map(l=>l.gst_rate))].sort((a,b)=>a-b).filter(r=>it.length&&(new Set(it.map(l=>l.gst_rate)).size===1||it.some(l=>l.gst_rate===r&&l.cgst+l.sgst+l.igst>0))).map(r=>{const sm=k=>it.filter(l=>l.gst_rate===r).reduce((a,l)=>a+paise(l[k]),0)/100;return c.igst?`<tr><td>IGST (${r}%)<td class=r>${inr2(sm('igst'))}</tr>`:`<tr><td>CGST (${r/2}%)<td class=r>${inr2(sm('cgst'))}</tr><tr><td>SGST (${r/2}%)<td class=r>${inr2(sm('sgst'))}</tr>`}).join('');
+  $('#sum').innerHTML=`<table class=sm><tr><td>Taxable value<td class=r>${inr2(c.taxable)}</tr>${rows}<tr><td><b>Total</b><td class=r><b>${inr2(c.amount)}</b></tr></table>`;
+  const q=pt();$('#pos').textContent=!S.state||!q?.state?'Set your state in Settings and the customer state for the correct tax split.':c.igst?'Inter-state supply: IGST applies.':'Intra-state supply: CGST + SGST apply.'};
+ box.addEventListener('input',e=>{const d=e.target.closest('.ln');if(!d||!e.target.dataset.f)return;lines[+d.dataset.i][e.target.dataset.f]=e.target.value;upd()});
+ box.addEventListener('change',e=>{const d=e.target.closest('.ln');if(!d||!e.target.dataset.f)return;lines[+d.dataset.i][e.target.dataset.f]=e.target.value;upd()});
+ box.addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;lines.splice(+b.closest('.ln').dataset.i,1);draw()});
+ $('#addl').onclick=()=>{if(!ITEMS&&lines.length>=1){alert('Several lines need migration 021 in Supabase (supabase/migrations/021_invoice_items.sql).');return}lines.push(dflt());draw();box.querySelector('.ln:last-child [data-f=description]').focus()};
+ f.elements.party_id.onchange=upd;draw();
+ f.onsubmit=e=>{e.preventDefault();return guard(f,async()=>{const e2=f.elements,iss=GF.lineIssues(lines);if(iss.length)return alert(iss.join('\n'));
+  const num=e2.number.value.trim();if(i.some(x=>x.kind==='sale'&&x.id!==EID&&String(x.number).trim().toLowerCase()===num.toLowerCase()))return alert('Invoice number '+num+' already exists. Use a unique number.');
+  const c=calc();if(!(c.amount>0))return alert('The invoice total must be more than zero.');
+  const hdr={party_id:e2.party_id.value,number:num,date:e2.date.value,due_date:e2.due_date.value||null,place_of_supply:e2.place_of_supply.value||null,reverse_charge:e2.reverse_charge.checked,...GF.headerFromLines(c),...(H.on&&e2.gl_account_id?{gl_account_id:e2.gl_account_id.value||null}:{})};
+  if(EID){if(await lockedBlock(X.date,hdr.date))return;
+   if(+X.adjusted>0&&paise(c.taxable)!==paise(X.taxable))return alert('This document has credit/debit notes or TDS against it. Issue a further note instead of changing its value.');
+   if(paise(c.amount)<paise(X.paid)+paise(X.adjusted))return alert('The new total ('+inr2(c.amount)+') is less than the amount already received ('+inr2(X.paid)+'). Delete or reduce the payments first.')}
+  let id=null,viaRpc=false;
+  if(ITEMS){const r=await db.rpc('save_sales_invoice',{p_invoice:EID||null,p_h:hdr,p_items:c.items});
+   if(!r.error){id=r.data;viaRpc=true}else if(!noFn(r.error))return alert(r.error.message)}
+  if(!viaRpc){
+   if(c.items.length>1)return alert('Invoices with several lines need migration 021 (supabase/migrations/021_invoice_items.sql) in Supabase. Run it, or combine these into one line.');
+   const l=c.items[0],row={party_id:hdr.party_id,number:hdr.number,date:hdr.date,due_date:hdr.due_date,taxable:c.taxable,gst_rate:l.gst_rate,cgst:c.cgst,sgst:c.sgst,igst:c.igst,amount:c.amount,...(hdr.gl_account_id!==undefined&&(EID||hdr.gl_account_id)?{gl_account_id:hdr.gl_account_id}:{})};
+   const nw={description:l.description||null,hsn_sac:l.hsn_sac||null,quantity:l.quantity!==1?l.quantity:null,unit:l.unit||null,place_of_supply:hdr.place_of_supply,reverse_charge:hdr.reverse_charge};
+   if(!EID)for(const k of Object.keys(nw))if(nw[k]===null||nw[k]===false)delete nw[k];
+   const r=await GF.saveCompat(rw=>EID?db.from('invoices').update(rw).eq('id',EID):db.from('invoices').insert(rw).select().single(),EID?{...row,...nw}:{...row,kind:'sale',...nw},GF.INVOICE_NEW);
+   if(r.error)return alert(r.error.message);id=EID||(r.data&&r.data.id);
+   if(r.dropped&&(r.lost||[]).length)alert('Saved, but the description / HSN / quantity details were not stored because migration 020 has not been run in Supabase yet.')}
+  location.href='invoice.html?id='+id+'&kind=sale'})};
+}
 </script></body></html>
