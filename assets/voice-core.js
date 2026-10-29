@@ -442,11 +442,10 @@ function stmtStep(st, t, D, first) {
   if (!s.party) { st.awaiting = 'party'; return R(st, 'Statement of which ' + (s.kind === 'supplier' ? 'supplier' : s.kind === 'client' ? 'customer' : 'customer or supplier') + '? Please say the name.', {t: 'info', text: 'Say the ' + (s.kind === 'supplier' ? 'supplier' : 'customer') + ' name'}); }
   if (s.from === undefined) { s.from = fyStart(D.today); s.to = D.today; s.label = 'this financial year'; }
   const p = D.parties.find(x => x.id === s.party), ph = phoneOf(p.phone);
-  if (!ph) return R(idle({awaiting: 'more'}), 'There is no WhatsApp number saved for ' + p.name + '. Please add the phone number on the ' + (p.kind === 'client' ? 'customer' : 'supplier') + ' page. Anything else required?', {t: 'info', text: 'No phone number saved for ' + p.name});
   const info = D.stmtInfo ? D.stmtInfo(p, s.from, s.to) : {closing: 0};
   st.awaiting = 'confirm';
-  const lines = [[p.kind === 'client' ? 'Customer' : 'Supplier', p.name], ['WhatsApp', '+' + ph], ['Period', s.label], ['Closing balance', '₹' + inrWords(info.closing)]];
-  return R(st, 'Send ledger statement of ' + p.name + ' for ' + s.label + ', closing balance ' + inrWords(info.closing) + ' rupees, on WhatsApp? Say yes to send, or say a different period.', {t: 'confirm', lines, title: 'Confirm WhatsApp statement'});
+  const lines = [[p.kind === 'client' ? 'Customer' : 'Supplier', p.name], ['WhatsApp', ph ? '+' + ph : 'Not saved (PDF only)'], ['Period', s.label], ['Closing balance', '₹' + inrWords(info.closing)]];
+  return R(st, (ph ? 'Create the PDF ledger statement of ' + p.name + ' for ' + s.label + ', closing balance ' + inrWords(info.closing) + ' rupees, and share it on WhatsApp? Say yes to create it, or say a different period.' : 'Create the PDF ledger statement of ' + p.name + ' for ' + s.label + ', closing balance ' + inrWords(info.closing) + ' rupees? No WhatsApp number is saved, so you can share the PDF from your share sheet. Say yes to create it, or say a different period.'), {t: 'confirm', lines, title: 'Confirm PDF statement'});
 }
 
 const api = {wake, tokSim, step, afterPost, norm, digitize, parseDate, takeBill, takeAmount, matchBills, partyScore, findParties, phoneOf, period, niceDate, inrWords, isYes, isNo, pending, fyStart, addDays, FLOW, HELP};

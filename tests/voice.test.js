@@ -162,11 +162,13 @@ ok(r2.act && r2.act.type === 'whatsapp' && r2.act.phone === '919890011223' && r2
 r = V.step(null, 'share ledger statement to supplier sharma traders', D());
 ok(r.state.slots.party === 's1' && r.state.awaiting === 'confirm', 'supplier statement');
 r = V.step(null, 'share ledger statement to supplier sharda enterprises', D());
-ok(/no WhatsApp number saved for Sharda/i.test(r.say) && !r.act, 'no phone saved -> tells you, nothing sent', r.say);
+ok(r.state.awaiting === 'confirm' && r.view.lines.some(l => l[0] === 'WhatsApp' && /Not saved/.test(l[1])), 'no phone saved -> still offers the PDF statement', r.say);
+r = V.step(r.state, 'yes', D());
+ok(r.act && r.act.type === 'whatsapp' && r.act.phone === '', 'no phone: PDF action carries an empty phone');
 r = V.step(null, 'share ledger statement to customer', D());
 ok(r.state.awaiting === 'party', 'statement without a name asks for it');
 r2 = V.step(r.state, 'gupta and sons', D());
-ok(/no WhatsApp number/.test(r2.say), 'landline-only customer -> no WhatsApp number message', r2.say);
+ok(r2.state.awaiting === 'confirm' && r2.view.lines.some(l => l[0] === 'WhatsApp' && /Not saved/.test(l[1])), 'landline-only customer -> PDF only, no WhatsApp number', r2.say);
 r = V.step(null, 'send statement to customer patel computers', D());
 ok(r.state.slots.party === 'c3', 'Patel vs Patil picked correctly by spelling');
 r = V.step(null, 'share ledger statement to customer pati computers', D());

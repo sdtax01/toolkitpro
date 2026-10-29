@@ -41,7 +41,7 @@ function speak(text) {
 let DATA = null, EXTRA = null;
 async function fresh() { const d = await load0(); DATA = d; return d; }
 async function ensureStatement() {
-  if (typeof TP === 'undefined') await new Promise(r => { const s = document.createElement('script'); s.src = 'assets/reports-lib.js?v=20261028'; s.onload = s.onerror = r; document.head.appendChild(s); });
+  if (typeof TP === 'undefined') await new Promise(r => { const s = document.createElement('script'); s.src = 'assets/reports-lib.js?v=20261030'; s.onload = s.onerror = r; document.head.appendChild(s); });
   if (!EXTRA) {
     const [nq, dq] = await Promise.all([db.from('gst_notes').select('*'), db.from('tds_entries').select('*')]);
     EXTRA = [...(nq.error ? [] : nq.data || []).map(n => ({invoice_id: n.invoice_id, date: n.date, amount: n.amount, label: n.kind === 'credit' ? 'Credit note' : 'Debit note', ref: n.number})),
@@ -234,15 +234,30 @@ async function doPost2(a) {
   try { if (typeof toast === 'function') toast((a.sale ? 'Receipt' : 'Payment') + ' posted'); LP = null; if (window.refresh) window.refresh(); } catch (_) {}
   await speak(r.say); return r;
 }
+/* "Share ledger statement": builds the A4 statement PDF (assets/pdf.js), saves it, and offers Share PDF (device share sheet, needs a tap) and an Open WhatsApp chat with the message. */
+async function ensurePdf() {
+  const add = src => new Promise(r => { const e = document.createElement('script'); e.src = src; e.onload = e.onerror = r; document.head.appendChild(e); });
+  if (!window.GF) await add('assets/gst-fields.js?v=20261030');
+  if (!window.TPPdf) await add('assets/pdf.js?v=20261030');
+  if (!window.GF || !window.TPPdf) throw new Error('PDF files are missing on the site (assets/gst-fields.js, assets/pdf.js)');
+}
 async function doWhatsApp(a) {
-  if (!a.phone) { showSay('No WhatsApp number saved.'); return {listen: true}; }
-  let msg; try { await fresh(); await ensureStatement(); msg = stmtText(a); } catch (e) { showSay('Could not build the statement: ' + e.message); await speak('Sorry, I could not build the statement.'); return {listen: true}; }
-  const url = 'https://wa.me/' + a.phone + '?text=' + encodeURIComponent(msg);
-  const w = window.open(url, '_blank', 'noopener');
+  let res, text;
+  try {
+    await fresh(); await ensureStatement(); await ensurePdf();
+    const d = DATA, p = d.p.find(x => x.id === a.party), st = TP.statement(p, d.i, d.t, a.from || null, a.to || null, EXTRA || []), biz = (d.S && d.S.business_name) || 'Shree Digitax Solutions';
+    res = await TPPdf.statement({S: d.S || {}, P: p, st, from: a.from || '', to: a.to, today: today()});
+    text = 'Dear ' + p.name + ',\n\nPlease find attached the statement of account (' + (a.from ? Core.niceDate(a.from) : 'from the beginning') + ' to ' + Core.niceDate(a.to) + '). Closing balance: ₹' + Core.inrWords(st.closing) + '.\n\nRegards,\n' + biz;
+  } catch (e) { showSay('Could not build the statement PDF: ' + e.message); await speak('Sorry, I could not build the statement PDF.'); return {listen: true}; }
+  try { TPPdf.download(res); } catch (_) {}
+  const url = a.phone ? 'https://wa.me/' + a.phone + '?text=' + encodeURIComponent(text) : '';
   state = {flow: null, awaiting: 'more', slots: {}};
-  const say = w ? 'I have opened WhatsApp with the statement for ' + a.name + '. Press send in WhatsApp. Anything else required?' : 'The statement for ' + a.name + ' is ready. Tap the green button to open WhatsApp, then press send. Anything else required?';
-  showSay(say); el.view.innerHTML = `<div class=dn><svg class=tick viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="30"/><path d="M24 39l10 10 19-21"/></svg><p>Statement ready for ${E(a.name)}</p><div class=acts><button type=button class=go id=vx-wa>Open WhatsApp</button></div></div>`;
-  el.view.querySelector('#vx-wa').onclick = () => window.open(url, '_blank', 'noopener');
+  const say = 'The PDF statement for ' + a.name + ' is ready and saved. Tap Share PDF to send it on WhatsApp. Anything else required?';
+  showSay(say);
+  el.view.innerHTML = `<div class=dn><svg class=tick viewBox="0 0 76 76" aria-hidden="true"><circle cx="38" cy="38" r="30"/><path d="M24 39l10 10 19-21"/></svg><p>Statement PDF ready for ${E(a.name)}</p><div class=acts><button type=button class=go id=vx-sh>Share PDF</button>${url ? '<button type=button id=vx-wa>WhatsApp message</button>' : ''}<button type=button id=vx-dl>Download again</button></div></div>`;
+  el.view.querySelector('#vx-sh').onclick = async () => { const r = await TPPdf.share(res, text, a.phone); if (r === 'downloaded' && typeof toast === 'function') toast('PDF saved. Attach it in WhatsApp.'); };
+  const wa = el.view.querySelector('#vx-wa'); if (wa) wa.onclick = () => window.open(url, '_blank', 'noopener');
+  el.view.querySelector('#vx-dl').onclick = () => TPPdf.download(res);
   await speak(say); return {listen: true};
 }
 
