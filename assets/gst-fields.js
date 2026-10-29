@@ -69,6 +69,37 @@ async function saveCompat(run, row, newKeys) {
   }
   return r;
 }
-const api = {STATES, stateCodeByName, stateName, canonState, stateCodeOf, panOf, PAN_RE, PIN_RE, GST_TYPES, gstTypeOf, gstTypeLabel, PARTY_NEW, SETTINGS_NEW, INVOICE_NEW, stateOpts, typeOpts, partyFields, partyIssues, colErr, saveCompat};
+
+/* ---------- multi-line invoices ----------
+   calcLines(lines, taxFn): each line {description, hsn_sac, quantity, unit, rate, discount, gst_rate}.
+   taxFn(taxable, rate) -> {cgst, sgst, igst}; the page passes the app's gst() so the intra / inter-state decision and the CGST = SGST rounding are the same as for single-line invoices.
+   Tax is worked out per line (each rounded to the paisa) and the invoice carries the sum, so header totals always equal the sum of the lines. */
+const p2 = n => Math.round((+n || 0) * 100 + ((+n || 0) < 0 ? -1e-9 : 1e-9));
+function calcLines(lines, taxFn) {
+  const out = []; let tv = 0, cg = 0, sg = 0, ig = 0; const byRate = new Map();
+  (lines || []).forEach((l, i) => {
+    const qty = +l.quantity > 0 ? +l.quantity : 1, rate = +l.rate || 0, disc = Math.max(0, +l.discount || 0), gr = +l.gst_rate || 0;
+    const gross = Math.round(qty * rate * 100 + 1e-9), dsc = Math.min(gross, p2(disc)), t = (gross - dsc) / 100;
+    const g = taxFn(t, gr), c = p2(g.cgst), s2 = p2(g.sgst), ii = p2(g.igst);
+    out.push({line_no: i + 1, description: String(l.description || '').trim(), hsn_sac: String(l.hsn_sac || '').trim(), quantity: qty, unit: String(l.unit || '').trim(), rate, discount: dsc / 100, taxable: t, gst_rate: gr, cgst: c / 100, sgst: s2 / 100, igst: ii / 100});
+    tv += p2(t); cg += c; sg += s2; ig += ii; byRate.set(gr, (byRate.get(gr) || 0) + p2(t));
+  });
+  let top = 0, best = -1; byRate.forEach((v, r) => { if (v > best || (v === best && r > top)) { best = v; top = r; } });
+  return {items: out, taxable: tv / 100, cgst: cg / 100, sgst: sg / 100, igst: ig / 100, tax: (cg + sg + ig) / 100, amount: (tv + cg + sg + ig) / 100, gst_rate: top, mixed: byRate.size > 1};
+}
+/* Header columns written for a multi-line invoice (description / HSN of the first line so lists and old screens still show something). */
+const headerFromLines = (c) => ({taxable: c.taxable, gst_rate: c.gst_rate, cgst: c.cgst, sgst: c.sgst, igst: c.igst, amount: c.amount, description: (c.items[0] || {}).description + (c.items.length > 1 ? ' (+' + (c.items.length - 1) + ' more)' : ''), hsn_sac: (c.items[0] || {}).hsn_sac || null});
+function lineIssues(lines) {
+  const out = [];
+  (lines || []).forEach((l, i) => { const n = 'Line ' + (i + 1) + ': ';
+    if (!String(l.description || '').trim()) out.push(n + 'description is missing');
+    if (!(+l.rate > 0)) out.push(n + 'rate must be more than zero');
+    if (l.quantity !== '' && l.quantity != null && !(+l.quantity > 0)) out.push(n + 'quantity must be more than zero');
+    if (String(l.hsn_sac || '').trim() && !/^\d{4,8}$/.test(String(l.hsn_sac).trim())) out.push(n + 'HSN / SAC must be 4 to 8 digits');
+    if ((+l.discount || 0) > (+l.quantity > 0 ? +l.quantity : 1) * (+l.rate || 0)) out.push(n + 'discount is larger than the line value');
+  });
+  return out;
+}
+const api = {calcLines, headerFromLines, lineIssues, STATES, stateCodeByName, stateName, canonState, stateCodeOf, panOf, PAN_RE, PIN_RE, GST_TYPES, gstTypeOf, gstTypeLabel, PARTY_NEW, SETTINGS_NEW, INVOICE_NEW, stateOpts, typeOpts, partyFields, partyIssues, colErr, saveCompat};
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.GF = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -67,7 +67,15 @@ function partyScore(name, utter) {
   if (!nt.length || !ut.length) return 0;
   let w = 0, got = 0;
   for (const n of nt) { const wt = GENERIC.has(n) ? .35 : 1; w += wt; let b = 0; for (const u of ut) b = Math.max(b, tokSim(n, u)); got += wt * b; }
-  return got / w;
+  let full = got / w;
+  /* Short / partial names: when every meaningful word spoken matches a distinctive word of the name ("acme" for "Acme Industries Pvt Ltd"), the party is a good candidate even though the other words of its name were not said. */
+  const key = nt.filter(n => !GENERIC.has(n) && !/^\d+$/.test(n)), words = ut.filter(u => /^[a-z]{3,}$/.test(u));
+  if (key.length && words.length && words.length === ut.filter(u => !/^\d+$/.test(u)).length) {
+    let sum = 0, ok = true; const used = new Set();
+    for (const u of words) { let b = 0, bi = -1; key.forEach((n, i) => { const t = tokSim(n, u); if (t > b) { b = t; bi = i; } }); if (b < .8) { ok = false; break; } sum += b; used.add(bi); }
+    if (ok) full = Math.max(full, .62 + .28 * (sum / words.length));
+  }
+  return full;
 }
 const ACCT_GENERIC = new Set(['current', 'saving', 'savings', 'account', 'bank', 'ac', 'a/c', 'in', 'hand', 'od', 'cc', 'of', 'the', 'and']);
 function acctScore(name, utter) {

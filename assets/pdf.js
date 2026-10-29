@@ -3,7 +3,7 @@
    In the browser, TPPdf.invoice(...) / TPPdf.statement(...) load jsPDF and the fonts on first use, then return {blob, filename, doc}.
    Tax Invoice contents follow Rule 46, CGST Rules 2017: supplier name, address, GSTIN; consecutive invoice number and date; recipient name, address, state and code, GSTIN;
    place of supply; HSN/SAC; description, quantity, taxable value; rate and amount of CGST / SGST / IGST; reverse charge; signature of the supplier; amount in words.
-   Tax rules change: have your CA confirm the contents for your case (for example e-invoice QR/IRN when your turnover requires it is NOT produced here). */
+   E-invoicing (IRN / QR) is not required for this business and is not produced here. */
 (function (root) {
 'use strict';
 const GF = root.GF || (typeof require !== 'undefined' ? require('./gst-fields.js') : null);
@@ -99,8 +99,14 @@ function footers(doc, k, env, note) {
 }
 
 /* ============================ TAX INVOICE ============================ */
-function invoiceChecks(S, P, x) {
-  const err = [], warn = [];
+/* Lines of an invoice: the saved item rows when there are some, otherwise one line made from the invoice itself (single-line invoices). */
+function linesOf(x, items) {
+  if (items && items.length) return items.map(i => ({description: i.description, hsn_sac: i.hsn_sac, quantity: +i.quantity > 0 ? +i.quantity : 1, unit: i.unit, rate: +i.rate || 0, discount: +i.discount || 0, taxable: +i.taxable || 0, gst_rate: +i.gst_rate || 0, cgst: +i.cgst || 0, sgst: +i.sgst || 0, igst: +i.igst || 0}));
+  const q = +x.quantity > 0 ? +x.quantity : 1, t = +x.taxable || 0;
+  return [{description: x.description, hsn_sac: x.hsn_sac, quantity: q, unit: x.unit, rate: t / q, discount: 0, taxable: t, gst_rate: +x.gst_rate || 0, cgst: +x.cgst || 0, sgst: +x.sgst || 0, igst: +x.igst || 0}];
+}
+function invoiceChecks(S, P, x, items) {
+  const err = [], warn = [], L = items && items.length ? items : null;
   if (x.taxable == null) err.push('This invoice has no GST breakup. Use "Set GST" first.');
   if (!String(S.business_name || '').trim()) warn.push('Your business name is missing in Settings');
   if (!String(S.gstin || '').trim()) warn.push('Your GSTIN is missing in Settings: the document will be titled "Invoice", not "Tax Invoice"');
@@ -112,23 +118,33 @@ function invoiceChecks(S, P, x) {
   const no = String(x.number || '');
   if (no.length > 16) warn.push('Invoice number is longer than 16 characters (Rule 46 allows at most 16)');
   if (!/^[A-Za-z0-9\/-]+$/.test(no)) warn.push('Invoice number should use only letters, digits, "-" and "/"');
-  if (!String(x.hsn_sac || '').trim()) warn.push('HSN / SAC code is missing on this invoice');
-  else if (!/^\d{4,8}$/.test(String(x.hsn_sac).trim())) warn.push('HSN / SAC should be 4 to 8 digits');
-  if (!String(x.description || '').trim()) warn.push('Description of goods / services is missing on this invoice');
+  if (L) L.forEach((l, i) => {
+    const n = L.length > 1 ? 'Line ' + (i + 1) + ': ' : '';
+    if (!String(l.hsn_sac || '').trim()) warn.push(n + 'HSN / SAC code is missing'); else if (!/^\d{4,8}$/.test(String(l.hsn_sac).trim())) warn.push(n + 'HSN / SAC should be 4 to 8 digits');
+    if (!String(l.description || '').trim()) warn.push(n + 'description is missing');
+  });
+  else {
+    if (!String(x.hsn_sac || '').trim()) warn.push('HSN / SAC code is missing on this invoice');
+    else if (!/^\d{4,8}$/.test(String(x.hsn_sac).trim())) warn.push('HSN / SAC should be 4 to 8 digits');
+    if (!String(x.description || '').trim()) warn.push('Description of goods / services is missing on this invoice');
+  }
   return {errors: err, warnings: warn};
 }
 
 function buildInvoice(env, a) {
-  const S = a.S || {}, P = a.P || {}, x = a.x, doc = newDoc(env), k = kit(doc), {m, w} = PAGE, R = w - m, W = w - 2 * m;
+  const S = a.S || {}, P = a.P || {}, x = a.x, doc = newDoc(env), k = kit(doc), {m, w, h} = PAGE, R = w - m, W = w - 2 * m, LIM = h - 18;
   const sup = !!(S.gstin && String(S.gstin).trim()), title = sup ? 'TAX INVOICE' : 'INVOICE';
+  const L = linesOf(x, a.items), multi = L.length > 1;
   let y = header(doc, k, env, S, title, 'ORIGINAL FOR RECIPIENT');
-  const taxable = +x.taxable || 0, rate = +x.gst_rate || 0, inter = +x.igst > 0, cg = +x.cgst || 0, sg = +x.sgst || 0, ig = +x.igst || 0, total = +x.amount || 0;
+  const total = +x.amount || 0, taxable = +x.taxable || 0, inter = L.some(l => l.igst > 0) || +x.igst > 0;
   const supCode = GF.stateCodeOf(S.gstin, S.state) || '', rcvCode = GF.stateCodeOf(P.gstin, P.state) || '';
   const pos = x.place_of_supply || P.state || '', posCode = GF.stateCodeByName(pos) || rcvCode;
+  /* continuation page: slim header so every page says which invoice it belongs to */
+  const nextPage = () => { doc.addPage(); k.fill(C.navy); doc.rect(0, 0, w, 3.2, 'F'); k.fill(C.blue); doc.rect(0, 3.2, w, 0.7, 'F'); k.t(S.business_name || 'Shree Digitax Solutions', m, 11, {s: 10, b: 1, c: C.navy}); k.t(title + ' ' + (x.number || '') + ' (continued)', R, 11, {s: 9, b: 1, c: C.blue, al: 'right'}); k.hline(m, R, 14, C.line, 0.3); return 19; };
   /* --- row of key facts --- */
   const cells = [['Invoice No.', x.number || ''], ['Invoice Date', dmy(x.date)], ['Due Date', x.due_date ? dmy(x.due_date) : '-'], ['Reverse Charge', x.reverse_charge ? 'Yes' : 'No']], cw = W / cells.length;
   k.box(m, y, W, 12, {bg: C.soft});
-  cells.forEach((c, i) => { const cx = m + i * cw; if (i) k.hline(cx, cx, y, C.line); if (i) { k.stroke(C.line); doc.setLineWidth(0.25); doc.line(cx, y + 2, cx, y + 10); } k.t(c[0], cx + 3, y + 4.6, {s: 7, c: C.mut}); k.t(c[1], cx + 3, y + 9.3, {s: 10, b: 1, c: C.ink}); });
+  cells.forEach((c, i) => { const cx = m + i * cw; if (i) { k.stroke(C.line); doc.setLineWidth(0.25); doc.line(cx, y + 2, cx, y + 10); } k.t(c[0], cx + 3, y + 4.6, {s: 7, c: C.mut}); k.t(c[1], cx + 3, y + 9.3, {s: 10, b: 1, c: C.ink}); });
   y += 15.5;
   /* --- receiver and supply boxes --- */
   const bw = 112, sx = m + bw + 4, sw = W - bw - 4, top = y;
@@ -139,45 +155,64 @@ function buildInvoice(env, a) {
   const rows = [['State', P.state ? P.state + (rcvCode ? ' (Code ' + rcvCode + ')' : '') : (rcvCode ? 'Code ' + rcvCode : '-')], ['GSTIN', P.gstin ? String(P.gstin).toUpperCase() : (GF.gstTypeOf(P) === 'unregistered' ? 'Unregistered' : '-')]];
   const pan = P.pan || GF.panOf(P.gstin); if (pan) rows.push(['PAN', String(pan).toUpperCase()]);
   ly += 1; rows.forEach(r => { k.t(r[0], m + 3.5, ly, {s: 8, c: C.mut}); k.t(r[1], m + 20, ly, {s: 8.5, b: 1}); ly += 4.1; });
-  const bh = Math.max(ly - top + 1.5, 36);  /* supply box needs 36 mm for its three entries */
-  k.box(m, top, bw, bh);
-  k.box(sx, top, sw, bh);
+  const bh = Math.max(ly - top + 1.5, 36);  /* the supply box needs 36 mm for its three entries */
+  k.box(m, top, bw, bh); k.box(sx, top, sw, bh);
   let ry = top + 5.4; k.t('SUPPLY DETAILS', sx + 3.5, ry, {s: 7, b: 1, c: C.blue}); ry += 4.8;
   [['Place of supply', pos ? pos + (posCode ? ' (' + posCode + ')' : '') : '-'], ['Supplier state', S.state ? S.state + (supCode ? ' (' + supCode + ')' : '') : '-'], ['Type of supply', inter ? 'Inter-state (IGST)' : 'Intra-state (CGST + SGST)']].forEach(r => {
     k.t(r[0], sx + 3.5, ry, {s: 7, c: C.mut}); ry = k.para(r[1], sx + 3.5, ry + 3.5, sw - 7, {s: 8.5, b: 1, max: 2}) + 1.8;
   });
   y = top + Math.max(bh, ry - top + 1) + 5;
-  /* --- items table --- */
-  const cols = [['#', 8, 'c'], ['Description of goods / services', 62, 'l'], ['HSN / SAC', 20, 'c'], ['Qty', 18, 'r'], ['Rate (₹)', 24, 'r'], ['GST %', 14, 'c'], ['Taxable value (₹)', 36, 'r']];
+  /* --- items table (rows can run onto further pages; the header repeats) --- */
+  const hasDisc = L.some(l => l.discount > 0.004);
+  const cols = hasDisc ? [['#', 8, 'c'], ['Description of goods / services', 54, 'l'], ['HSN / SAC', 19, 'c'], ['Qty', 17, 'r'], ['Rate (₹)', 22, 'r'], ['Disc. (₹)', 18, 'r'], ['GST %', 12, 'c'], ['Taxable value (₹)', 32, 'r']]
+    : [['#', 8, 'c'], ['Description of goods / services', 62, 'l'], ['HSN / SAC', 20, 'c'], ['Qty', 18, 'r'], ['Rate (₹)', 24, 'r'], ['GST %', 14, 'c'], ['Taxable value (₹)', 36, 'r']];
   const tableHead = (cs, yy) => { k.fill(C.navy); doc.roundedRect(m, yy, W, 8, 1.2, 1.2, 'F'); let cx = m; cs.forEach(c => { const al = c[2] === 'r' ? 'right' : c[2] === 'c' ? 'center' : 'left', tx = c[2] === 'r' ? cx + c[1] - 2.5 : c[2] === 'c' ? cx + c[1] / 2 : cx + 2.5; k.t(c[0], tx, yy + 5.2, {s: 7.5, b: 1, c: C.white, al}); cx += c[1]; }); return yy + 8; };
+  const cellAt = (cs, i, cx, yy, v, o) => { const c = cs[i]; k.t(v, c[2] === 'r' ? cx + c[1] - 2.5 : c[2] === 'c' ? cx + c[1] / 2 : cx + 2.5, yy, Object.assign({s: 9, al: c[2] === 'r' ? 'right' : c[2] === 'c' ? 'center' : 'left'}, o || {})); };
+  if (y + 8 + 14 > LIM) y = nextPage();
   y = tableHead(cols, y);
-  const qty = +x.quantity > 0 ? +x.quantity : 1, unitTxt = x.unit ? ' ' + x.unit : '', unitRate = taxable / qty;
-  const dl = k.wrap(x.description || 'Goods / services supplied', cols[1][1] - 5, 9, false), rh = Math.max(9, dl.length * k.lh(9) + 4);
-  let cx = m; const vals = ['1', null, x.hsn_sac || '-', (Number.isInteger(qty) ? String(qty) : String(qty)) + unitTxt, fmt(unitRate), rate + '%', fmt(taxable)];
-  vals.forEach((v, i) => { const c = cols[i], al = c[2] === 'r' ? 'right' : c[2] === 'c' ? 'center' : 'left'; if (i === 1) { dl.forEach((ln, j) => k.t(ln, cx + 2.5, y + 5.6 + j * k.lh(9), {s: 9})); } else k.t(v, c[2] === 'r' ? cx + c[1] - 2.5 : c[2] === 'c' ? cx + c[1] / 2 : cx + 2.5, y + 5.6, {s: 9, al, b: i === 6}); cx += c[1]; });
-  y += rh; k.hline(m, R, y, C.line, 0.25); y += 6;
-  /* --- tax summary --- */
+  L.forEach((l, n) => {
+    const dl = k.wrap(l.description || 'Goods / services supplied', cols[1][1] - 5, 9, false), rh = Math.max(9, dl.length * k.lh(9) + 4);
+    if (y + rh > LIM) { y = tableHead(cols, nextPage()); }
+    if (n % 2 === 1) { k.fill([248, 250, 255]); doc.rect(m, y, W, rh, 'F'); }
+    const qtxt = String(l.quantity) + (l.unit ? ' ' + l.unit : '');
+    const vals = [String(n + 1), null, l.hsn_sac || '-', qtxt, fmt(l.rate), ...(hasDisc ? [l.discount > 0.004 ? fmt(l.discount) : '-'] : []), l.gst_rate + '%', fmt(l.taxable)];
+    let cx = m; vals.forEach((v, i) => { if (i === 1) dl.forEach((ln, j) => k.t(ln, cx + 2.5, y + 5.6 + j * k.lh(9), {s: 9})); else cellAt(cols, i, cx, y + 5.6, v, {b: i === vals.length - 1}); cx += cols[i][1]; });
+    y += rh; k.hline(m, R, y, C.line, 0.2);
+  });
+  y += 6;
+  /* --- tax summary by HSN / SAC and rate --- */
+  const grp = new Map(); L.forEach(l => { const kk = (l.hsn_sac || '-') + '|' + l.gst_rate, g = grp.get(kk) || {hsn: l.hsn_sac || '-', rate: l.gst_rate, t: 0, cg: 0, sg: 0, ig: 0}; g.t += paise(l.taxable); g.cg += paise(l.cgst); g.sg += paise(l.sgst); g.ig += paise(l.igst); grp.set(kk, g); });
+  const G = [...grp.values()].sort((p, q) => String(p.hsn).localeCompare(String(q.hsn)) || p.rate - q.rate);
   const tcols = inter ? [['HSN / SAC', 36, 'c'], ['Taxable value (₹)', 40, 'r'], ['IGST rate', 30, 'c'], ['IGST amount (₹)', 40, 'r'], ['Total tax (₹)', 36, 'r']] : [['HSN / SAC', 26, 'c'], ['Taxable value (₹)', 34, 'r'], ['CGST rate', 18, 'c'], ['CGST amt (₹)', 28, 'r'], ['SGST rate', 18, 'c'], ['SGST amt (₹)', 28, 'r'], ['Total tax (₹)', 30, 'r']];
+  if (y + 8 + 9 * Math.min(G.length, 2) > LIM) y = nextPage();
   y = tableHead(tcols, y);
-  const tv = inter ? [x.hsn_sac || '-', fmt(taxable), rate + '%', fmt(ig), fmt(ig)] : [x.hsn_sac || '-', fmt(taxable), (rate / 2) + '%', fmt(cg), (rate / 2) + '%', fmt(sg), fmt((paise(cg) + paise(sg)) / 100)];
-  cx = m; tv.forEach((v, i) => { const c = tcols[i]; k.t(v, c[2] === 'r' ? cx + c[1] - 2.5 : c[2] === 'c' ? cx + c[1] / 2 : cx + 2.5, y + 5.6, {s: 9, al: c[2] === 'r' ? 'right' : c[2] === 'c' ? 'center' : 'left'}); cx += c[1]; });
-  y += 9; k.hline(m, R, y, C.line, 0.25); y += 6;
-  /* --- words (left) and totals (right) --- */
+  G.forEach(g => {
+    if (y + 9 > LIM) y = tableHead(tcols, nextPage());
+    const tv = inter ? [g.hsn, fmt(g.t / 100), g.rate + '%', fmt(g.ig / 100), fmt(g.ig / 100)] : [g.hsn, fmt(g.t / 100), (g.rate / 2) + '%', fmt(g.cg / 100), (g.rate / 2) + '%', fmt(g.sg / 100), fmt((g.cg + g.sg) / 100)];
+    let cx = m; tv.forEach((v, i) => { cellAt(tcols, i, cx, y + 5.6, v); cx += tcols[i][1]; }); y += 9; k.hline(m, R, y, C.line, 0.2);
+  });
+  y += 6;
+  /* --- totals: one tax line per rate --- */
+  const lines = [['Taxable value', fmt(taxable)]], rates = [...new Set(L.map(l => l.gst_rate))].sort((p, q) => p - q);
+  const showRates = rates.filter(r => rates.length === 1 || L.some(l => l.gst_rate === r && (l.cgst + l.sgst + l.igst) > 0));
+  showRates.forEach(r => {
+    const sum = f => L.filter(l => l.gst_rate === r).reduce((q, l) => q + paise(l[f]), 0) / 100;
+    if (inter) lines.push(['IGST @ ' + r + '%', fmt(sum('igst'))]); else { lines.push(['CGST @ ' + (r / 2) + '%', fmt(sum('cgst'))]); lines.push(['SGST @ ' + (r / 2) + '%', fmt(sum('sgst'))]); }
+  });
+  const paid = +x.paid || 0, adj = +x.adjusted || 0, extra = (paid > 0.004 ? 5.4 : 0) + (adj > 0.004 ? 5.4 : 0) + (paid > 0.004 || adj > 0.004 ? 7 : 0);
+  const totH = lines.length * 6.2 + 12 + extra, termsH = S.terms && String(S.terms).trim() ? Math.min(6, k.wrap(String(S.terms), W, 8, false).length) * k.lh(8) + 7.5 : 0, need = Math.max(21, totH) + 5 + 34 + 5 + termsH + 14;
+  if (y + Math.max(21, totH) > LIM) y = nextPage();  /* totals stay together; the blocks below move on only when they do not fit */
   const lw = 104, tx0 = m + lw + 4, tw = W - lw - 4, ty0 = y;
-  const lines = [['Taxable value', fmt(taxable)]];
-  if (inter) lines.push(['IGST @ ' + rate + '%', fmt(ig)]); else { lines.push(['CGST @ ' + (rate / 2) + '%', fmt(cg)]); lines.push(['SGST @ ' + (rate / 2) + '%', fmt(sg)]); }
   let ty = y; lines.forEach(r => { k.t(r[0], tx0 + 3, ty + 4.4, {s: 9, c: C.mut}); k.t('₹ ' + r[1], R - 3, ty + 4.4, {s: 9, al: 'right'}); ty += 6.2; });
   k.fill(C.navy); doc.roundedRect(tx0, ty, tw, 9.5, 1.4, 1.4, 'F'); k.t('Total invoice value', tx0 + 3, ty + 6.2, {s: 9, b: 1, c: C.white}); k.t('₹ ' + fmt(total), R - 3, ty + 6.4, {s: 11, b: 1, c: C.white, al: 'right'}); ty += 12;
-  const paid = +x.paid || 0, adj = +x.adjusted || 0;
   if (paid > 0.004) { k.t(a.sale === false ? 'Amount paid' : 'Amount received', tx0 + 3, ty + 3.6, {s: 8.5, c: C.mut}); k.t('₹ ' + fmt(paid), R - 3, ty + 3.6, {s: 8.5, al: 'right'}); ty += 5.4; }
   if (adj > 0.004) { k.t('Credit / debit notes and TDS', tx0 + 3, ty + 3.6, {s: 8.5, c: C.mut}); k.t('₹ ' + fmt(adj), R - 3, ty + 3.6, {s: 8.5, al: 'right'}); ty += 5.4; }
   if (paid > 0.004 || adj > 0.004) { const bal = (paise(total) - paise(paid) - paise(adj)) / 100; k.t('Balance due', tx0 + 3, ty + 4, {s: 9, b: 1}); k.t('₹ ' + fmt(bal), R - 3, ty + 4, {s: 9.5, b: 1, c: bal > 0.004 ? C.er : C.ok, al: 'right'}); ty += 7; }
-  /* amount in words */
   k.box(m, ty0, lw, 21, {bg: C.soft}); k.t('AMOUNT IN WORDS', m + 3.5, ty0 + 5.2, {s: 7, b: 1, c: C.blue}); k.para(inrWords(total), m + 3.5, ty0 + 10.2, lw - 7, {s: 9.5, b: 1, c: C.navy, max: 3});
   y = Math.max(ty, ty0 + 21) + 5;
   /* --- bank + signature --- */
-  const bank = [['Bank', S.bank_name], ['A/c no.', S.bank_account], ['IFSC', S.bank_ifsc], ['UPI', S.upi_id]].filter(r => r[1]);
-  const bh2 = 34;
+  if (y + 34 > LIM) y = nextPage();
+  const bank = [['Bank', S.bank_name], ['A/c no.', S.bank_account], ['IFSC', S.bank_ifsc], ['UPI', S.upi_id]].filter(r => r[1]), bh2 = 34;
   k.box(m, y, lw, bh2); k.t('BANK DETAILS', m + 3.5, y + 5.2, {s: 7, b: 1, c: C.blue});
   if (bank.length) bank.forEach((r, i) => { k.t(r[0], m + 3.5, y + 11 + i * 5, {s: 8, c: C.mut}); k.t(String(r[1]), m + 20, y + 11 + i * 5, {s: 8.8, b: 1}); });
   else k.para('Add your bank details in Settings to print them here.', m + 3.5, y + 11, lw - 7, {s: 8, c: C.mut});
@@ -185,7 +220,9 @@ function buildInvoice(env, a) {
   k.hline(tx0 + 8, R - 4, y + bh2 - 9, C.mut, 0.3); k.t('Authorised signatory' + (S.signatory ? ': ' + S.signatory : ''), R - 4, y + bh2 - 4.6, {s: 8, c: C.mut, al: 'right'});
   y += bh2 + 5;
   /* --- terms + declaration --- */
+  if (y + termsH > LIM) y = nextPage();
   if (S.terms && String(S.terms).trim()) { k.t('TERMS & CONDITIONS', m, y, {s: 7, b: 1, c: C.blue}); y = k.para(String(S.terms), m, y + 4.2, W, {s: 8, c: C.ink, max: 6}) + 3; }
+  if (y + 14 > LIM) y = nextPage();
   k.t('DECLARATION', m, y, {s: 7, b: 1, c: C.blue});
   y = k.para('We declare that this invoice shows the actual price of the goods / services described and that all particulars are true and correct.' + (x.reverse_charge ? ' Tax on this supply is payable by the recipient on reverse charge basis.' : ''), m, y + 4.2, W, {s: 8, c: C.mut});
   footers(doc, k, env, sup ? 'This is a computer-generated tax invoice' : 'This is a computer-generated invoice');
@@ -242,7 +279,7 @@ function buildStatement(env, a) {
 /* ============================ browser glue ============================ */
 /* WhatsApp number in international form, or '' when the saved number cannot take WhatsApp (landline, unknown shape). */
 const waPhone = p => { let d = String(p || '').replace(/\D/g, '').replace(/^00/, ''); if (!d) return ''; if (d.length === 10 && /^[6-9]/.test(d)) return '91' + d; if (d.length === 11 && /^0[6-9]/.test(d)) return '91' + d.slice(1); if (d.length === 12 && /^91[6-9]/.test(d)) return d; return d.length >= 11 && !/^0/.test(d) && !/^91/.test(d) ? d : ''; };
-const api = {waPhone, fmt, rs, dmy, inrWords, stampOf, gstinOk, invoiceChecks, buildInvoice, buildStatement, safeName, PAGE, C};
+const api = {linesOf, waPhone, fmt, rs, dmy, inrWords, stampOf, gstinOk, invoiceChecks, buildInvoice, buildStatement, safeName, PAGE, C};
 let ENV = null;
 const b64 = buf => { let s = ''; const u = new Uint8Array(buf), n = 0x8000; for (let i = 0; i < u.length; i += n) s += String.fromCharCode.apply(null, u.subarray(i, i + n)); return btoa(s); };
 const getBuf = async u => { const r = await fetch(u); if (!r.ok) throw new Error('Could not load ' + u.split('?')[0] + ' (' + r.status + ')'); return r.arrayBuffer(); };
