@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261028"><script src="assets/vendor/supabase.js?v=20261028"></script><script src="assets/app.js?v=20261028"></script><script src="assets/reports-lib.js?v=20261028"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261030"><script src="assets/vendor/supabase.js?v=20261030"></script><script src="assets/app.js?v=20261030"></script><script src="assets/reports-lib.js?v=20261030"></script></head><body><script>
 let from=Q.get('from')??TP.fyStart(today()),to=Q.get('to')??today(),kind='all';
 boot('Day Book',async function render(m){
  const L=await loadLedger();if(ledgerGate(m,L))return;const{i}=await load();
