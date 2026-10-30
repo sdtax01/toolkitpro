@@ -231,3 +231,6 @@ nav .ng:focus-visible,nav .nt:focus-visible,nav .nsub a:focus-visible{outline-co
 @media(prefers-reduced-motion:reduce){nav .nc,aside{transition:none!important}}
 @media(forced-colors:active){nav .nt.on,nav .nsub a.on{outline:2px solid Highlight}}
 @media(min-width:901px){aside{width:clamp(228px,16vw,252px)}}
+
+/* import / export, settings tools */
+.tablewrap{overflow-x:auto}.mrow{padding:10px 0;border-top:1px solid #e4e8f2}.mrow:first-of-type{border-top:0}

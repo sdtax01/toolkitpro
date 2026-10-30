@@ -16,11 +16,11 @@ const NAV=[
  {t:'Dashboard',h:'index.html',i:'home'},
  {g:'sales',t:'Sales',i:'sales',c:[['Customers','customers.html?kind=client'],['Sales Invoices','invoices.html?kind=sale'],['Credit Notes','notes.html?kind=credit'],['Debtors Ageing','ageing.html?kind=sale'],['Customer Statements','statement.html?kind=client']]},
  {g:'purchases',t:'Purchases',i:'purchases',c:[['Suppliers','customers.html?kind=supplier'],['Purchase Bills','invoices.html?kind=purchase'],['Debit Notes','notes.html?kind=debit'],['Creditors Ageing','ageing.html?kind=purchase'],['Supplier Statements','statement.html?kind=supplier']]},
- {g:'accounting',t:'Accounting',i:'accounting',c:[['Transactions','transactions.html'],['Banking','banking.html'],['Bank Reconciliation','bank-rec.html'],['Closing Stock','stock.html'],['Fixed Assets','fixed-assets.html'],['Other Assets','assets.html'],['Budgets','budgets.html'],['Financial Goals','goals.html']]},
+ {g:'accounting',t:'Accounting',i:'accounting',c:[['Transactions','transactions.html'],['Banking','banking.html'],['Import / Export','import-export.html'],['Bank Reconciliation','bank-rec.html'],['Closing Stock','stock.html'],['Fixed Assets','fixed-assets.html'],['Other Assets','assets.html'],['Budgets','budgets.html'],['Financial Goals','goals.html']]},
  {g:'tax',t:'Tax & Compliance',i:'tax',c:[['GST & Taxes','taxes.html'],['Credit / Debit Notes','notes.html'],['TDS Entries','tds.html'],['Documents & Uploads','documents.html'],['Compliance Calendar','calendar.html'],['Reminders','reminders.html']]},
  {g:'reports',t:'Reports & Insights',i:'reports',c:[['Reports Dashboard','reports.html'],['Monthly / Financial Year Analysis','reports.html#monthly'],['Business Overview','overview.html'],['Daily Summary','daily.html']]},
  {g:'books',t:'Books of Accounts',i:'books',c:[['Trial Balance','trial-balance.html'],['General Ledger','ledger.html'],['Cash Book','ledger.html?book=cash'],['Day Book','daybook.html'],['Journal Entry (Manual Posting)','journal-new.html'],['Profit & Loss','profit-loss.html'],['Balance Sheet','balance-sheet.html'],['Financial Statements (Schedule III)','statements.html',[['Balance Sheet','statements.html#sch-bs'],['Statement of Profit and Loss','statements.html#sch-pl'],['Cash Flow Statement','statements.html#sch-cf']]],['Year-end Review','year-end.html'],['Chart of Accounts','coa.html'],['Ledger Setup','ledger-setup.html']]},
- {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Application Settings','settings.html#app'],['Voice Assistant','settings.html#voice']]}
+ {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Document Numbering','settings.html#series'],['Application Settings','settings.html#app'],['Voice Assistant','settings.html#voice'],['Data Reset','settings.html#reset']]}
 ];
 /* Detail pages belong to a menu item: party.html is a customer/supplier, invoice.html and invoice-new.html are a sales invoice/purchase bill. */
 const navAlias=(f,q)=>f==='party.html'?['customers.html',{kind:q.kind==='supplier'?'supplier':'client'}]:(f==='invoice.html'||f==='invoice-new.html')?['invoices.html',{kind:q.kind==='purchase'?'purchase':'sale'}]:f==='statement.html'?['statement.html',{kind:q.kind==='supplier'?'supplier':'client'}]:[f,q];
@@ -121,6 +121,23 @@ function editBox(title,fields,vals,save){
  })}
 const SKEL=`<div class=sk role=status aria-label="Loading"><div class=skr><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div><div class=skc><i class=b></i><i class=b></i></div><div class=skl><i class=b></i><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div></div>`,QSK='<div class=skq><i class=b></i><i class=b></i><i class=b></i><i class=b></i></div>';
 const nul=d=>Object.fromEntries(Object.entries(d).map(([k,v])=>[k,v===''?null:v]));
+/* ---- Document numbering series (settings.doc_series, see assets/doc-series.js). Pages that call these load doc-series.js; without it, or before migration 022, the old INV-/BILL-/CN-/DN- numbers are produced. ---- */
+const existingNos=async(k,i)=>{try{
+ if(k==='sale'||k==='purchase')return(i||[]).filter(x=>x.kind===k).map(x=>x.number);
+ if(k==='credit'||k==='debit')return(await fetchAll(()=>db.from('gst_notes').select('number').eq('kind',k))).map(x=>x.number);
+ return(await fetchAll(()=>db.from('transactions').select('voucher_no').not('voucher_no','is',null))).map(x=>x.voucher_no)}catch(_){return[]}};
+const nextDoc=async(k,S,i,date,reserved)=>{const s=typeof DS!=='undefined'?DS.getSeries(S,k):{prefix:{sale:'INV-',purchase:'BILL-',credit:'CN-',debit:'DN-',expense:'EXP-'}[k],digits:4,start:1,suffix:''};
+ const ex=await existingNos(k,i);if(typeof DS!=='undefined')return DS.nextNumber(s,ex,date||today(),reserved).no;
+ const hi=ex.reduce((m,x)=>Math.max(m,parseInt(String(x).replace(/\D+/g,''),10)||0),0);return s.prefix+String(Math.max(hi,ex.length)+1).padStart(4,'0')};
+const settingsRow=async()=>{try{const r=await db.from('settings').select('*').limit(1);return(r.data||[])[0]||{}}catch(_){return{}}};
+/* Insert a transaction that carries an expense voucher number. Before migration 022 the column does not exist: the row is saved without a number. A clash (another tab used the number first) is retried once with a fresh number. */
+const insertVoucher=async(row,date)=>{if(!row.voucher_no)return db.from('transactions').insert(row);
+ let r=await db.from('transactions').insert(row);
+ if(r.error&&r.error.code==='23505'&&/voucher/i.test(r.error.message)){row.voucher_no=await nextDoc('expense',await settingsRow(),[],date);r=await db.from('transactions').insert(row)}
+ if(r.error&&/voucher_no/.test(r.error.message)&&r.error.code!=='23505'){delete row.voucher_no;r=await db.from('transactions').insert(row)}
+ return r};
+/* GST Rule 46 / 53: a tax invoice or note number has at most 16 characters: letters, digits, "-" and "/". Returns true when the number may be used (asks first when it breaks the rule). */
+const docNoGate=no=>/^[A-Za-z0-9\/-]{1,16}$/.test(String(no).trim())||confirm('GST allows at most 16 characters (letters, digits, - and /) in a tax invoice or note number. Use "'+no+'" anyway?');
 function login(){
  document.documentElement.classList.add('auth');document.body.className='auth';
  const ic={
@@ -140,7 +157,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261030" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261031" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -193,11 +210,11 @@ function login(){
  form.addEventListener('input',()=>{if(msg.classList.contains('er'))say('')});
  $('#e').focus()}
 /* Voice assistant: loaded on every signed-in page (microphone button at the bottom right). Safe to call twice. */
-let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261030').then(()=>add('assets/voice.js?v=20261030')).then(res)}));
+let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261031').then(()=>add('assets/voice.js?v=20261031')).then(res)}));
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const file=location.pathname.split('/').pop()||'index.html',Qo=Object.fromEntries(Q),fb=act||file+location.search,nowOn=()=>navFind(file,Qo,location.hash,fb),on=nowOn();
- document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261030" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261031" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  const setNav=o=>{document.body.classList.toggle('navopen',o);$('#mn').setAttribute('aria-expanded',o)};
  $('#mn').onclick=()=>setNav(!document.body.classList.contains('navopen'));
  $('#scrim').onclick=()=>setNav(false);
