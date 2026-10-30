@@ -1,0 +1,40 @@
+// Document numbering series: node tests/series.test.js (no install needed)
+const DS=require('../assets/doc-series.js');
+let bad=0;const ok=(c,m)=>{console.log((c?'PASS ':'FAIL ')+m);if(!c)bad++};
+const s0=DS.getSeries(null,'sale');
+ok(s0.prefix==='INV-'&&s0.digits===4&&s0.start===1,'defaults reproduce INV-0001');
+ok(DS.nextNumber(s0,[],'2026-10-30').no==='INV-0001','first number');
+ok(DS.nextNumber(s0,['INV-0001','INV-0007','inv-0003'],'2026-10-30').no==='INV-0008','highest + 1, case-insensitive');
+ok(DS.nextNumber(s0,['INV-0007','BILL-0099','2026/15'],'2026-10-30').no==='INV-0008','other prefixes and odd numbers are ignored');
+ok(DS.nextNumber(DS.getSeries(null,'credit'),['CN-0002'],'2026-10-30').no==='CN-0003','credit notes');
+ok(DS.nextNumber(DS.getSeries(null,'expense'),[],'2026-10-30').no==='EXP-0001','expense vouchers');
+const fy={sale:{prefix:'SDS/{FYS}/',digits:3,start:1}};
+const sf=DS.getSeries({doc_series:fy},'sale');
+ok(DS.fyOf('2026-04-01').full==='2026-27'&&DS.fyOf('2027-03-31').full==='2026-27'&&DS.fyOf('2026-03-31').full==='2025-26','financial year boundaries');
+ok(DS.nextNumber(sf,[],'2026-10-30').no==='SDS/26-27/001','FY token in prefix');
+ok(DS.nextNumber(sf,['SDS/26-27/001','SDS/26-27/002','SDS/25-26/090'],'2026-10-30').no==='SDS/26-27/003','counts only the same financial year');
+ok(DS.nextNumber(sf,['SDS/26-27/001','SDS/25-26/090'],'2026-03-15').no==='SDS/25-26/091','document date, not today, picks the year');
+ok(DS.nextNumber(sf,['SDS/26-27/001'],'2027-04-02').no==='SDS/27-28/001','restarts in the new year');
+const st=DS.getSeries({doc_series:{sale:{prefix:'A-',digits:2,start:101}}},'sale');
+ok(DS.nextNumber(st,[],'2026-10-30').no==='A-101','start number is a floor');
+ok(DS.nextNumber(st,['A-150'],'2026-10-30').no==='A-151','start never lowers the next number');
+ok(DS.nextNumber(s0,['INV-9999'],'2026-10-30').no==='INV-10000','grows past the digit count');
+ok(DS.nextNumber(s0,['INV-0001'],'2026-10-30',['INV-0002','INV-0003']).no==='INV-0004','reserved numbers (importer) are skipped');
+const sx=DS.getSeries({doc_series:{purchase:{prefix:'PB-',digits:3,suffix:'/{FYS}'}}},'purchase');
+ok(DS.nextNumber(sx,['PB-004/26-27'],'2026-10-30').no==='PB-005/26-27','suffix series');
+ok(DS.nextNumber(sx,['PB-004/25-26'],'2026-10-30').no==='PB-001/26-27','suffix with FY restarts');
+// validation
+const iss=(k,o)=>DS.issues(k,DS.clean(k,o));
+ok(iss('sale',{prefix:'INV-'}).length===0,'default is valid');
+ok(iss('sale',{prefix:'INVOICE/{FY}/',digits:4}).some(x=>x.hard),'17+ characters refused for a tax invoice');
+ok(iss('sale',{prefix:'INV/{FY}/',digits:4}).length===0,'exactly 16 characters allowed');
+ok(iss('sale',{prefix:'INV#'}).some(x=>x.hard),'illegal character refused for a tax invoice');
+ok(iss('purchase',{prefix:'PB#',digits:3}).length===0,'purchase bills are your own reference: no GST character rule');
+ok(iss('credit',{prefix:'CN {x}'}).some(x=>x.hard),'unknown brace token refused');
+ok(iss('sale',{prefix:'',suffix:''}).some(x=>!x.hard),'bare digits warn');
+// storing
+ok(JSON.stringify(DS.toStore({}))==='{}','untouched settings store nothing');
+const ts=DS.toStore({sale:{prefix:'X-',digits:5},purchase:DS.DEFAULTS.purchase});
+ok(Object.keys(ts).join()==='sale'&&ts.sale.digits===5,'only changed series are stored');
+ok(DS.clean('sale',{digits:99,start:-4}).digits===9&&DS.clean('sale',{start:-4}).start===1,'digits and start are clamped');
+process.exit(bad?1:0);
