@@ -109,3 +109,15 @@ A microphone button sits at the bottom right of every signed-in page. Tap it and
 
 ### Voice: partial party names
 Saying only part of a name ("acme", "zenith") now finds the party if every word you said matches a distinctive word of its name. If several parties share that word, the assistant asks which one.
+
+## Numbering series, Import / Export and Reset posted entries (migration 022)
+Run `supabase/migrations/022_series_import_reset.sql` once (after 010-020, and 021 if you have it). Staging first, after a backup. Undo: `supabase/undo/022_series_import_reset_down.sql`.
+The app still opens before the migration is run: numbering uses the standard series, imports work, and reset works while the ledger is off.
+
+- **Settings > Document numbering**: prefix, digits, start number and suffix for Sales Invoices, Purchase Bills, Expenses, Credit Notes and Debit Notes, with a live "next number" preview. `{FY}` = 2026-27, `{FYS}` = 26-27 (the series restarts every 1 April). The next number is the highest one already used in the same series plus one, so numbers are never reused. Sales invoices, credit notes and debit notes are limited to 16 characters of A-Z, 0-9, "-" and "/" (GST Rules 46 and 53). Expenses now get a voucher number (`transactions.voucher_no`).
+- **Settings > Data reset**: erases only posted entries (sales invoices, purchase bills and their lines, receipts, payments, expenses, credit and debit notes, TDS entries, stock valuations, depreciation postings and the journals made from them). Kept: customers, suppliers, bank and cash accounts and opening balances, chart of accounts, fixed-asset register, settings, budgets, goals, reminders, documents. You must type RESET, a JSON backup downloads first, and it refuses while a period lock is set. It runs in one database transaction (`reset_posted_entries`).
+- **Accounting > Import / Export**: sales invoices, purchase bills and bank entries (separate Debit and Credit columns; Debit = money out, Credit = money in). Download the standard template, fill it, upload (CSV or .xlsx, up to 5,000 rows or 8 MB). Steps: map columns, check screen, confirm, post. Names that are not in your books show "Use suggested spelling", "Choose another" or "Create new" before anything posts. Nothing is created until you confirm. Rows with errors can be skipped and downloaded as a report. Re-uploading the same file posts nothing twice. Export uses the same columns, so a file can be edited and re-imported.
+- Several-line invoices need migration 021. Without it they are reported and not posted; they are never merged silently.
+
+Tests: `node tests/series.test.js`, `node tests/import.test.js`, `tests/sql/phase5_test.sql`, and the browser test `NODE_PATH=$(npm root -g) node tests/import-e2e.js` (needs playwright).
+Note: the copies of `app.js` and `app.css` in the project root are stale and not used by the pages (they load `assets/`). Cache version is now `20261031`.

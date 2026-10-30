@@ -107,3 +107,9 @@ Unzip `toolkitpro-main-phase4.zip` and upload the contents over your repository 
 
 ## Not done (needs your CA or a further phase)
 HSN/SAC and invoice line items, reverse charge, e-invoice/e-way bill, TDS/TCS rate and return engine, income-tax block depreciation, asset disposal, accruals/prepaids/provisions, expected credit loss, current and deferred tax, notes to accounts, GSTR file exports. Roles and maker-checker were intentionally left out (single-user, as you asked).
+
+## This update (series, import/export, reset)
+1. Upload everything, including the new files: `import-export.html`, `assets/doc-series.js`, `assets/settings-tools.js`, `assets/import-core.js`, `assets/import-ui.js`, `supabase/migrations/022_series_import_reset.sql`, `supabase/undo/022_series_import_reset_down.sql`, and the `tests/` additions.
+2. Changed files: `assets/app.js`, `assets/app.css`, `settings.html`, `invoice-new.html`, `notes.html`, `banking.html`, `transactions.html`, and the version number in every page.
+3. Run migration 022 in the Supabase SQL editor (staging first).
+4. Hard-refresh the browser (version 20261031).

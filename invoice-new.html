@@ -1,8 +1,10 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261030"><script src="assets/vendor/supabase.js?v=20261030"></script><script src="assets/app.js?v=20261030"></script><script src="assets/gst-fields.js?v=20261030"></script></head><body><script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Toolkit Pro</title><link rel="preconnect" href="https://dpgkabvyappujokiujoh.supabase.co" crossorigin><link rel="stylesheet" href="assets/app.css?v=20261031"><script src="assets/vendor/supabase.js?v=20261031"></script><script src="assets/app.js?v=20261031"></script><script src="assets/gst-fields.js?v=20261031"></script><script src="assets/doc-series.js?v=20261031"></script></head><body><script>
 const sale=Q.get('kind')==='purchase'?'purchase':'sale',kind=sale==='sale'?'client':'supplier',N=sale==='sale'?'Invoice':'Bill',P1=sale==='sale'?'Customer':'Supplier';
 const EID=sale==='sale'?Q.get('edit'):null;
+/* New document: when the date moves into another financial year the suggested number follows (only while the user has not typed their own number). */
+function autoNo(f,k,S,i){const n=f.elements.number,d=f.elements.date;if(!n||!d)return;n.addEventListener('input',()=>{n.dataset.touched=1});d.addEventListener('change',async()=>{if(n.dataset.touched||!d.value)return;n.value=await nextDoc(k,S,i,d.value)})}
 boot((EID?'Edit ':'New ')+N,async m=>{
- const H=await loadHeads(sale),{p,i,S}=await load(),ps=p.filter(x=>x.kind===kind),pre=Q.get('party')||'',no=(sale==='sale'?'INV-':'BILL-')+String(i.filter(x=>x.kind===sale).reduce((mx,x)=>Math.max(mx,parseInt(String(x.number).replace(/\D+/g,''),10)||0),i.filter(x=>x.kind===sale).length)+1).padStart(4,'0'),dd=(()=>{const d=new Date();d.setDate(d.getDate()+15);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
+ const H=await loadHeads(sale),{p,i,S}=await load(),ps=p.filter(x=>x.kind===kind),pre=Q.get('party')||'',no=await nextDoc(sale,S,i,today()),dd=(()=>{const d=new Date();d.setDate(d.getDate()+15);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')})();
  if(!ps.length){m.innerHTML=`<div class=card>Add a ${P1.toLowerCase()} first. <a class=btn href="customers.html?kind=${kind}">Go to ${P1}s</a></div>`;return}
  if(sale==='sale')return saleForm(m,{H,p,i,S,ps,pre,no,dd});
  m.innerHTML=`<form id=f class="row c21"><div class=card><h3>${N} details</h3><div class=g2>
@@ -14,6 +16,7 @@ boot((EID?'Edit ':'New ')+N,async m=>{
  const f=$('#f'),calc=()=>{const e=f.elements,tv=+e.taxable.value||0,rt=+e.gst_rate.value||0,pt=ps.find(y=>y.id===e.party_id.value),g=gst(tv,rt,S,pt),tx=rup(paise(g.cgst)+paise(g.sgst)+paise(g.igst));return{tv,rt,g,pt,total:rup(paise(tv)+paise(tx))}};
  const upd=()=>{const{tv,rt,g,pt,total}=calc();$('#sum').innerHTML=`<table class=sm><tr><td>Taxable value<td class=r>${inr2(tv)}</tr>${g.igst?`<tr><td>IGST (${rt}%)<td class=r>${inr2(g.igst)}</tr>`:`<tr><td>CGST (${rt/2}%)<td class=r>${inr2(g.cgst)}</tr><tr><td>SGST (${rt/2}%)<td class=r>${inr2(g.sgst)}</tr>`}<tr><td><b>Total</b><td class=r><b>${inr2(total)}</b></tr></table>`;$('#pos').textContent=!S.state||!pt?.state?'Set your state in Settings and the contact state for the correct tax split.':g.igst?'Inter-state supply: IGST applies.':'Intra-state supply: CGST + SGST apply.'};
  f.oninput=upd;f.onchange=upd;upd();
+ autoNo(f,sale,S,i);
  f.onsubmit=e=>{e.preventDefault();return guard(f,async()=>{const e2=f.elements,{tv,rt,g,total}=calc();
   if(i.some(x=>x.kind===sale&&String(x.number).trim().toLowerCase()===e2.number.value.trim().toLowerCase()))return alert(N+' number '+e2.number.value+' already exists. Use a unique number.');
   const hs=(e2.hsn_sac&&e2.hsn_sac.value||'').trim();if(hs&&!/^\d{4,8}$/.test(hs))return alert('HSN / SAC must be 4 to 8 digits.');
@@ -57,9 +60,10 @@ async function saleForm(m,{H,p,i,S,ps,pre,no,dd}){
  box.addEventListener('change',e=>{const d=e.target.closest('.ln');if(!d||!e.target.dataset.f)return;lines[+d.dataset.i][e.target.dataset.f]=e.target.value;upd()});
  box.addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(!b)return;lines.splice(+b.closest('.ln').dataset.i,1);draw()});
  $('#addl').onclick=()=>{if(!ITEMS&&lines.length>=1){alert('Several lines need migration 021 in Supabase (supabase/migrations/021_invoice_items.sql).');return}lines.push(dflt());draw();box.querySelector('.ln:last-child [data-f=description]').focus()};
- f.elements.party_id.onchange=upd;draw();
+ f.elements.party_id.onchange=upd;draw();if(!EID)autoNo(f,'sale',S,i);
  f.onsubmit=e=>{e.preventDefault();return guard(f,async()=>{const e2=f.elements,iss=GF.lineIssues(lines);if(iss.length)return alert(iss.join('\n'));
   const num=e2.number.value.trim();if(i.some(x=>x.kind==='sale'&&x.id!==EID&&String(x.number).trim().toLowerCase()===num.toLowerCase()))return alert('Invoice number '+num+' already exists. Use a unique number.');
+  if(!EID&&!docNoGate(num))return;
   const c=calc();if(!(c.amount>0))return alert('The invoice total must be more than zero.');
   const hdr={party_id:e2.party_id.value,number:num,date:e2.date.value,due_date:e2.due_date.value||null,place_of_supply:e2.place_of_supply.value||null,reverse_charge:e2.reverse_charge.checked,...GF.headerFromLines(c),...(H.on&&e2.gl_account_id?{gl_account_id:e2.gl_account_id.value||null}:{})};
   if(EID){if(await lockedBlock(X.date,hdr.date))return;

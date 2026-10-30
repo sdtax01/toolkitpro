@@ -77,3 +77,8 @@ Items with a `#section` jump to a card on an existing page. They are views of th
 - **Record Receipt / Record Payment** on the Dashboard open the invoice or bill list, because a receipt recorded on the invoice page keeps that invoice's balance in step. For income or payments that belong to no invoice use Add Transaction.
 - **Other Assets** (`assets.html`) still offers a "Fixed Assets" category next to the Fixed Assets register (`fixed-assets.html`). They are separate stores (the first feeds the Dashboard portfolio chart, the second the ledger). This release does not change that; avoid entering the same asset in both.
 - **Genuinely new behaviour** (all read-only, no database change): the customer/supplier chooser on `statement.html` when opened without an id; the `?kind=credit|debit` filter on `notes.html`; section ids on four pages; sub-headings in the Settings form (same fields, same Save); the Dashboard "Quick actions" card.
+
+## Added
+- Accounting > Import / Export (`import-export.html`)
+- Settings > Document Numbering (`settings.html#series`)
+- Settings > Data Reset (`settings.html#reset`)
