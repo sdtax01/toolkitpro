@@ -24,7 +24,7 @@ const gstTypeLabel = t => (GST_TYPES.find(x => x[0] === t) || [, ''])[1];
 
 /* Fields that exist only after migration 020. If the database does not have them yet, saves retry without them (see saveCompat). */
 const PARTY_NEW = ['gst_type', 'pan', 'address', 'city', 'pincode'];
-const SETTINGS_NEW = ['pan', 'city', 'pincode', 'bank_name', 'bank_account', 'bank_ifsc', 'upi_id', 'signatory', 'terms', 'default_hsn'];
+const SETTINGS_NEW = ['pan', 'city', 'pincode', 'bank_name', 'bank_account', 'bank_ifsc', 'upi_id', 'signatory', 'terms', 'default_hsn', 'logo_data'];
 const INVOICE_NEW = ['description', 'hsn_sac', 'quantity', 'unit', 'reverse_charge', 'place_of_supply'];
 
 const stateOpts = cur => { const o = [['', 'Select state / UT'], ...STATES.map(s => [s[1], s[1] + ' (' + s[0] + ')'])]; const c = canonState(cur); if (c && !STATES.some(s => s[1] === c)) o.push([c, c]); return o; };

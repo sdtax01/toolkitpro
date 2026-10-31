@@ -66,12 +66,40 @@ function newDoc(env) {
   return doc;
 }
 
+/* ---------- UPI payment QR ---------- */
+const QRLIB = () => root.qrcode || (typeof require !== 'undefined' ? require('./vendor/qrcode.js') : null);
+const UPI_RE = /^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9]{1,63}$/;
+/* upi://pay link that UPI apps open. Amount is the balance still due; the note carries the invoice number. */
+function upiUri(S, amount, ref) {
+  const id = String((S && S.upi_id) || '').trim(); if (!UPI_RE.test(id)) return '';
+  const q = ['pa=' + encodeURIComponent(id).replace(/%40/g, '@'), 'pn=' + encodeURIComponent(String((S && S.business_name) || '').slice(0, 40) || 'Payee')];
+  if (amount > 0.004) q.push('am=' + (Math.round(amount * 100) / 100).toFixed(2));
+  q.push('cu=INR'); if (ref) q.push('tn=' + encodeURIComponent(('Invoice ' + ref).slice(0, 40)));
+  return 'upi://pay?' + q.join('&');
+}
+/* -> array of rows of booleans (true = dark module), or null when the QR library is missing */
+function qrModules(text) {
+  const L = QRLIB(); if (!L || !text) return null;
+  const q = L(0, 'M'); q.addData(text, 'Byte'); q.make(); const n = q.getModuleCount(), out = [];
+  for (let r = 0; r < n; r++) { const row = []; for (let c = 0; c < n; c++) row.push(!!q.isDark(r, c)); out.push(row); }
+  return out;
+}
+const fitText = (doc, s, size, maxW) => { s = String(s); doc.setFontSize(size); let t = s; while (t.length > 1 && doc.getTextWidth(t) > maxW) t = t.slice(0, -1); return t === s ? s : t.replace(/\s+$/, '') + '…'; };
+/* the image for the top-left of the page: the uploaded logo when there is one, else the built-in logo; kept in proportion inside a 28 x 16 mm box */
+function logoBox(doc, env, S) {
+  const src = (S && S.logo_data && /^data:image\/(png|jpeg);base64,/.test(S.logo_data)) ? S.logo_data : env.logo; if (!src) return null;
+  const fmt = /^data:image\/jpeg/.test(src) ? 'JPEG' : 'PNG'; let w = 24, h = 15.9;
+  if (src === S.logo_data) { try { const p = doc.getImageProperties(src), r = p.width / p.height; w = 28; h = w / r; if (h > 16) { h = 16; w = h * r; } } catch (_) { return env.logo ? {src: env.logo, fmt: 'PNG', w: 24, h: 15.9} : null; } }
+  return {src, fmt, w, h};
+}
+
 /* top colour bar + business block (logo, name, address, GSTIN, PAN, contact) and a title on the right. Returns y below the header. */
 function header(doc, k, env, S, title, sub) {
   const {m, w} = PAGE, R = w - m;
   k.fill(C.navy); doc.rect(0, 0, w, 3.2, 'F'); k.fill(C.blue); doc.rect(0, 3.2, w, 0.7, 'F');
   let x0 = m;
-  if (env.logo) { try { doc.addImage(env.logo, 'PNG', m, 8.5, 24, 15.9, undefined, 'FAST'); x0 = m + 28; } catch (_) { x0 = m; } }
+  const lg = logoBox(doc, env, S);
+  if (lg) { try { doc.addImage(lg.src, lg.fmt, m, 8.5 + (16 - lg.h) / 2, lg.w, lg.h, undefined, 'FAST'); x0 = m + 28; } catch (_) { x0 = m; } }
   const biz = S.business_name || 'Shree Digitax Solutions', tw = 112 - (x0 - m);
   let y = 13.2;
   k.t(biz, x0, y, {s: 13.5, b: 1, c: C.navy}); y += 4.6;
@@ -213,9 +241,16 @@ function buildInvoice(env, a) {
   /* --- bank + signature --- */
   if (y + 34 > LIM) y = nextPage();
   const bank = [['Bank', S.bank_name], ['A/c no.', S.bank_account], ['IFSC', S.bank_ifsc], ['UPI', S.upi_id]].filter(r => r[1]), bh2 = 34;
+  /* UPI QR on sales invoices that still have a balance: scanning opens the payment app with the amount and invoice number filled in */
+  const balDue = (paise(total) - paise(paid) - paise(adj)) / 100, qm = (a.sale !== false && balDue > 0.004 && !a.noQr) ? qrModules(upiUri(S, balDue, x.number)) : null, QS = 24;
   k.box(m, y, lw, bh2); k.t('BANK DETAILS', m + 3.5, y + 5.2, {s: 7, b: 1, c: C.blue});
-  if (bank.length) bank.forEach((r, i) => { k.t(r[0], m + 3.5, y + 11 + i * 5, {s: 8, c: C.mut}); k.t(String(r[1]), m + 20, y + 11 + i * 5, {s: 8.8, b: 1}); });
+  if (bank.length) bank.forEach((r, i) => { k.t(r[0], m + 3.5, y + 11 + i * 5, {s: 8, c: C.mut}); k.t(qm ? fitText(doc, r[1], 8.8, lw - 20 - QS - 6) : String(r[1]), m + 20, y + 11 + i * 5, {s: 8.8, b: 1}); });
   else k.para('Add your bank details in Settings to print them here.', m + 3.5, y + 11, lw - 7, {s: 8, c: C.mut});
+  if (qm) {
+    const qx = m + lw - QS - 3.5, qy = y + 7.4, cell = QS / qm.length; k.t('SCAN TO PAY (UPI)', m + lw - 3.5, y + 5.2, {s: 7, b: 1, c: C.blue, al: 'right'});
+    k.fill(C.white); doc.rect(qx - 0.8, qy - 0.8, QS + 1.6, QS + 1.6, 'F'); doc.setFillColor(0, 0, 0);
+    qm.forEach((row, r) => row.forEach((d, c2) => { if (d) doc.rect(qx + c2 * cell, qy + r * cell, cell + 0.03, cell + 0.03, 'F'); }));
+  }
   k.box(tx0, y, tw, bh2); k.t('For ' + (S.business_name || 'Shree Digitax Solutions'), R - 3, y + 5.6, {s: 8.8, b: 1, c: C.navy, al: 'right'});
   k.hline(tx0 + 8, R - 4, y + bh2 - 9, C.mut, 0.3); k.t('Authorised signatory' + (S.signatory ? ': ' + S.signatory : ''), R - 4, y + bh2 - 4.6, {s: 8, c: C.mut, al: 'right'});
   y += bh2 + 5;
@@ -279,7 +314,7 @@ function buildStatement(env, a) {
 /* ============================ browser glue ============================ */
 /* WhatsApp number in international form, or '' when the saved number cannot take WhatsApp (landline, unknown shape). */
 const waPhone = p => { let d = String(p || '').replace(/\D/g, '').replace(/^00/, ''); if (!d) return ''; if (d.length === 10 && /^[6-9]/.test(d)) return '91' + d; if (d.length === 11 && /^0[6-9]/.test(d)) return '91' + d.slice(1); if (d.length === 12 && /^91[6-9]/.test(d)) return d; return d.length >= 11 && !/^0/.test(d) && !/^91/.test(d) ? d : ''; };
-const api = {linesOf, waPhone, fmt, rs, dmy, inrWords, stampOf, gstinOk, invoiceChecks, buildInvoice, buildStatement, safeName, PAGE, C};
+const api = {upiUri, qrModules, UPI_RE, linesOf, waPhone, fmt, rs, dmy, inrWords, stampOf, gstinOk, invoiceChecks, buildInvoice, buildStatement, safeName, PAGE, C};
 let ENV = null;
 const b64 = buf => { let s = ''; const u = new Uint8Array(buf), n = 0x8000; for (let i = 0; i < u.length; i += n) s += String.fromCharCode.apply(null, u.subarray(i, i + n)); return btoa(s); };
 const getBuf = async u => { const r = await fetch(u); if (!r.ok) throw new Error('Could not load ' + u.split('?')[0] + ' (' + r.status + ')'); return r.arrayBuffer(); };
@@ -289,6 +324,7 @@ async function env() {
   ENV = (async () => {
     if (!(root.jspdf && root.jspdf.jsPDF)) await addScript('assets/vendor/jspdf.umd.min.js' + (QV ? '?' + QV : ''));
     const [rg, bd] = await Promise.all([getBuf('assets/vendor/Inter-Regular.ttf' + (QV ? '?' + QV : '')), getBuf('assets/vendor/Inter-Bold.ttf' + (QV ? '?' + QV : ''))]);
+    if (!root.qrcode) { try { await addScript('assets/vendor/qrcode.js' + (QV ? '?' + QV : '')); } catch (_) {} }
     let logo = null; try { logo = 'data:image/png;base64,' + b64(await getBuf('assets/logo.png' + (QV ? '?' + QV : ''))); } catch (_) {}
     return {JsPDF: root.jspdf.jsPDF, fonts: {regular: b64(rg), bold: b64(bd)}, logo};
   })();

@@ -5,9 +5,9 @@
 const h = s => esc(s);
 const dl = (name, data, type) => { const a = document.createElement('a'), u = URL.createObjectURL(new Blob([data], {type})); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000); };
 const XL = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const S = {tab: 'gstr1', mode: 'month', month: '', q2b: null, f2b: 'mismatch', data: null, opt: {slab: 'upto1_5', nil: false, freq: 'monthly', hsnDigits: 4, filed: '', due: '', ci: false, itcExcess: 0, perDay: 50, perDayNil: 20, pct: 18}};
-try { Object.assign(S.opt, JSON.parse(localStorage.getItem('tp_gstr_opt') || '{}'), {filed: '', due: '', ci: false}); } catch (_) {}
-const saveOpt = () => { try { const o = {...S.opt}; delete o.filed; delete o.due; delete o.ci; localStorage.setItem('tp_gstr_opt', JSON.stringify(o)); } catch (_) {} };
+const S = {tab: 'gstr1', mode: 'month', month: '', q2b: null, f2b: 'mismatch', data: null, opt: {slab: 'upto1_5', nil: false, freq: 'monthly', hsnDigits: 4, mp: true, filed: '', due: '', ci: false, itcExcess: 0, perDay: 50, perDayNil: 20, pct: 18}};
+try { Object.assign(S.opt, JSON.parse(localStorage.getItem('tp_gstr_opt') || '{}'), {filed: '', due: '', ci: false, mp: true}); } catch (_) {}
+const saveOpt = () => { try { const o = {...S.opt}; delete o.filed; delete o.due; delete o.ci; delete o.mp; localStorage.setItem('tp_gstr_opt', JSON.stringify(o)); } catch (_) {} };
 const prevMonth = () => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
 const range = () => {
   const [y, mo] = S.month.split('-').map(Number);
@@ -48,7 +48,8 @@ async function loadData() {
   const L = await load(); let notes = [], items = [], noteErr = false;
   try { notes = await fetchAll(() => db.from('gst_notes').select('*')); } catch (_) { noteErr = true; }
   try { items = await fetchAll(() => db.from('invoice_items').select('*')); } catch (_) {}
-  return {settings: L.S, parties: L.p, invoices: L.i, notes, items, noteErr};
+  let mpRows = []; try { const g0 = String((L.S && L.S.gstin) || '').trim().toUpperCase(); if (g0 && root.MP) mpRows = (await fetchAll(() => db.from('marketplace_orders').select('*'))).filter(o => o.seller_gstin === g0); } catch (_) {}
+  return {settings: L.S, parties: L.p, invoices: L.i, notes, items, noteErr, mpRows};
 }
 async function mount(m) {
   if (!S.month) S.month = prevMonth();
@@ -66,11 +67,16 @@ async function mount(m) {
     if (!/^\d{4}-\d{2}$/.test(S.month)) { body.innerHTML = '<div class=card><p>Choose a month.</p></div>'; return; }
     try { (S.tab === 'gstr1' ? g1 : S.tab === 'gstr3b' ? g3 : rc)(body, from, to); } catch (e) { body.innerHTML = '<div class=card><p role=alert style="color:#b42318">' + h(e.message || e) + '</p></div>'; }
   };
+  const mpOn = () => S.opt.mp && D.mpRows && D.mpRows.length > 0;
+  const DX = () => { if (!mpOn()) return D; const B = MP.asBooks(D.mpRows); return {...D, parties: D.parties.concat(B.parties), invoices: D.invoices.concat(B.invoices), items: D.items.concat(B.items), notes: D.notes.concat(B.notes)}; };
+  const mpCard = (from, to) => { if (!D.mpRows || !D.mpRows.length) return ''; const n = D.mpRows.filter(o => o.invoice_date >= from && o.invoice_date <= to).length;
+    return '<div class=card><label><input type=checkbox id=mpon' + (S.opt.mp ? ' checked' : '') + '> Include e-commerce (marketplace) sales for this GSTIN</label> <span class=k>' + n + ' line(s) in this period, imported on the <a href="marketplace.html">E-commerce Sales</a> page. They are added to the tables below and to Table 14. Untick to see the return without them.</span></div>'; };
+  const bindMp = (body, again) => { const e = body.querySelector('#mpon'); if (e) e.onchange = () => { S.opt.mp = e.checked; again(); }; };
   const gstin = () => String(D.settings.gstin || '').trim().toUpperCase();
   const stamp = () => S.month.replace('-', '');
   function g1(body, from, to) {
-    const r = GR.gstr1(D, from, to, {hsnDigits: S.opt.hsnDigits}), V = GR.validate1(r, {gstin: gstin(), hsnDigits: S.opt.hsnDigits}), LF = optsBox('gstr1', r, {}, r.fp, gstin().slice(0, 2)), T = r.totals, notesNote = D.noteErr ? '<p class=k>Credit / debit notes are not installed (migration 018), so notes are not included.</p>' : '';
-    body.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px">' +
+    const r = GR.gstr1(DX(), from, to, {hsnDigits: S.opt.hsnDigits}); if (mpOn()) { const sp = MP.supeco(D.mpRows, from, to); r.supeco = {clttx: sp.clttx}; sp.warnings.forEach(w => r.warnings.push({message: w, ref: ''})); } const V = GR.validate1(r, {gstin: gstin(), hsnDigits: S.opt.hsnDigits}), LF = optsBox('gstr1', r, {}, r.fp, gstin().slice(0, 2)), T = r.totals, notesNote = D.noteErr ? '<p class=k>Credit / debit notes are not installed (migration 018), so notes are not included.</p>' : '';
+    body.innerHTML = mpCard(from, to) + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px">' +
       [['Invoices in period', T.invoices, ''], ['B2B (registered)', inr2(T.b2b.taxable) + '<div class=k>' + T.b2b.count + ' invoices · tax ' + inr2(T.b2b.igst + T.b2b.cgst + T.b2b.sgst) + '</div>', ''], ['B2C large (inter-state, above the ₹1 lakh limit)', inr2(T.b2cl.taxable) + '<div class=k>' + T.b2cl.count + ' invoices</div>', ''], ['B2C small (consolidated)', inr2(T.b2cs.taxable) + '<div class=k>tax ' + inr2(T.b2cs.igst + T.b2cs.cgst + T.b2cs.sgst) + '</div>', ''], ['Nil / exempt', inr2(T.nil), '']].map(([l, v]) => '<div class=card style="margin:0"><div class=k>' + l + '</div><div class=v style="font-size:18px">' + v + '</div></div>').join('') + '</div>' +
       '<div class=card><div class=f2 style="flex-wrap:wrap"><button type=button id=x1>Download Excel</button><button type=button class=g id=j1>Download JSON for the offline tool</button></div>' + notesNote + '<p class=k>The JSON follows the GSTR-1 offline-tool layout (HSN split B2B / B2C, document issue, nil, exports). Turnover figures are not included in the file; the portal takes them from your profile. Check the Portal upload check below, then upload on the portal (Returns > GSTR-1 > Prepare offline) or import it into the offline tool first.</p></div>' + checkBox(V) + LF.html + warnBox(r.warnings) +
       '<div class=card><details open><summary><b>B2B: registered customers (' + r.b2b.length + ')</b></summary>' + tbl(['GSTIN', 'Customer', 'Invoice', 'Date', 'Place of supply', 'Rate %', 'Taxable', 'IGST', 'CGST', 'SGST'], r.b2b.flatMap(x => x.rows.map(l => [h(x.gstin), h(x.name), h(x.number), h(x.date), h(x.pos), l.rate, num(l.taxable), num(l.igst), num(l.cgst), num(l.sgst)])), [5, 6, 7, 8, 9]) + '</details></div>' +
@@ -81,13 +87,13 @@ async function mount(m) {
       '<div class=card><details><summary><b>HSN / SAC summary, registered customers (' + r.hsn.b2b.length + ')</b></summary><p class=k>Credit and debit notes are already taken off these figures.</p>' + hsnTbl(r.hsn.b2b) + '</details></div>' +
       '<div class=card><details><summary><b>HSN / SAC summary, consumers (' + r.hsn.b2c.length + ')</b></summary>' + hsnTbl(r.hsn.b2c) + '</details></div>' +
       '<div class=card><details><summary><b>Documents issued (' + r.docs.length + ')</b></summary>' + tbl(['Document', 'From', 'To', 'Total', 'Cancelled', 'Missing numbers'], r.docs.map(x => [h(x.label), h(x.from), h(x.to), x.total, x.cancelled, x.gaps ? '<b style="color:#b42318">' + x.gaps + '</b>' : '0']), [3, 4, 5]) + '</details></div>';
-    bindOpts(body, () => g1(body, from, to));
+    bindOpts(body, () => g1(body, from, to)); bindMp(body, () => g1(body, from, to));
     body.querySelector('#x1').onclick = () => dl('GSTR1-' + stamp() + '.xlsx', GR.toXlsx(GR.gstr1Sheets(r)), XL);
     body.querySelector('#j1').onclick = () => { const er = V.filter(x => x.level === 'error'); if (er.length && !confirm(er.length + ' problem(s) will make the GST portal reject this file (see Portal upload check). Download anyway?')) return; dl('GSTR1-' + stamp() + '.json', JSON.stringify(GR.gstr1Json(r, gstin()), null, 1), 'application/json'); };
   }
   function g3(body, from, to) {
-    const r = GR.gstr3b(D, from, to), LF = optsBox('gstr3b', null, r.t61.cash, r.fp, gstin().slice(0, 2)), a = r.t31, row = (l, x, cols) => '<tr><td>' + l + '<td class=r>' + (cols === 'tax' ? '' : num(x.taxable)) + '<td class=r>' + num(x.igst) + '<td class=r>' + num(x.cgst) + '<td class=r>' + num(x.sgst) + '</tr>';
-    body.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px">' + [['Output tax (3.1a)', inr2(r.totals.outwardTax)], ['Net ITC (4C)', inr2(r.totals.itcNet)], ['Cash to pay', inr2(r.totals.cash)]].map(([l, v]) => '<div class=card style="margin:0"><div class=k>' + l + '</div><div class=v>' + v + '</div></div>').join('') + '</div>' +
+    const r = GR.gstr3b(DX(), from, to), LF = optsBox('gstr3b', null, r.t61.cash, r.fp, gstin().slice(0, 2)), a = r.t31, row = (l, x, cols) => '<tr><td>' + l + '<td class=r>' + (cols === 'tax' ? '' : num(x.taxable)) + '<td class=r>' + num(x.igst) + '<td class=r>' + num(x.cgst) + '<td class=r>' + num(x.sgst) + '</tr>';
+    body.innerHTML = mpCard(from, to) + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px">' + [['Output tax (3.1a)', inr2(r.totals.outwardTax)], ['Net ITC (4C)', inr2(r.totals.itcNet)], ['Cash to pay', inr2(r.totals.cash)]].map(([l, v]) => '<div class=card style="margin:0"><div class=k>' + l + '</div><div class=v>' + v + '</div></div>').join('') + '</div>' +
       '<div class=card><div class=f2 style="flex-wrap:wrap"><button type=button id=x3>Download Excel</button><button type=button class=g id=j3>Download JSON</button></div></div>' + warnBox(r.warnings) +
       '<div class=card><h3>3.1 Outward and inward supplies</h3><div class=tablewrap><table><tr><th>Nature<th class=r>Taxable<th class=r>IGST<th class=r>CGST<th class=r>SGST</tr>' + row('(a) Outward taxable supplies (net of credit notes)', a.a) + row('(b) Zero rated: exports / SEZ', a.b) + row('(c) Nil rated and exempt', {taxable: a.c.taxable, igst: '', cgst: '', sgst: ''}) + row('(d) Inward supplies on reverse charge', a.d) + '</table></div></div>' +
       '<div class=card><h3>3.2 Inter-state supplies to consumers, by place of supply</h3>' + tbl(['Place of supply', 'Taxable', 'IGST'], r.t32.unreg.map(x => [h(x.pos), num(x.taxable), num(x.igst)]), [1, 2]) + '</div>' +
@@ -96,7 +102,7 @@ async function mount(m) {
       '<tr><td>Paid through IGST credit<td class=r>' + num(r.t61.itcUsed.igst.igst) + '<td class=r>' + num(r.t61.itcUsed.igst.cgst) + '<td class=r>' + num(r.t61.itcUsed.igst.sgst) + '</tr><tr><td>Paid through CGST credit<td class=r>' + num(r.t61.itcUsed.cgst.igst) + '<td class=r>' + num(r.t61.itcUsed.cgst.cgst) + '<td class=r></tr><tr><td>Paid through SGST credit<td class=r>' + num(r.t61.itcUsed.sgst.igst) + '<td class=r><td class=r>' + num(r.t61.itcUsed.sgst.sgst) + '</tr>' +
       row('<b>Paid in cash</b>', r.t61.cash, 'tax') + row('Credit left to carry forward', r.t61.carryForward, 'tax') + '</table></div><p class=k>Credit is applied in the order the law requires: IGST credit against IGST, then CGST, then SGST; CGST and SGST credit against their own tax first, then IGST; CGST credit is never used for SGST or the reverse.</p></div>';
     body.insertAdjacentHTML('beforeend', LF.html);
-    bindOpts(body, () => g3(body, from, to));
+    bindOpts(body, () => g3(body, from, to)); bindMp(body, () => g3(body, from, to));
     body.querySelector('#x3').onclick = () => dl('GSTR3B-' + stamp() + '.xlsx', GR.toXlsx(GR.gstr3bSheet(r)), XL);
     body.querySelector('#j3').onclick = () => dl('GSTR3B-' + stamp() + '.json', JSON.stringify(GR.gstr3bJson(r, gstin(), S.opt.ci ? {interest: LF.res.interest} : {}), null, 1), 'application/json');
   }

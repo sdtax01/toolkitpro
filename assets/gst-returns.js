@@ -131,7 +131,7 @@ function gstr1(data, from, to, opts) {
   const nOf = k => notes.filter(n => (C.invById.get(n.invoice_id) || {}).kind === 'sale' && n.kind === k);
   out.docs = [...series('Invoices for outward supply', sales), ...series('Credit Note', nOf('credit')), ...series('Debit Note', nOf('debit'))];
   out.docs.filter(d => d.gaps > 0).forEach(d => W(d.label + ' ' + d.from + ' to ' + d.to + ': ' + d.gaps + ' number(s) in the range are not in your books. Report them as cancelled in Table 13 if they were used.'));
-  W('Advance receipts (table 11), e-commerce supplies and amendments of earlier months are not covered. Add them in the return if you have any.');
+  W('Advance receipts (table 11), supplies on which the operator pays the tax (section 9(5)) and amendments of earlier months are not covered. Add them in the return if you have any. Supplies through an e-commerce operator are covered by the E-commerce Sales page.');
   if (out.nil.some(x => x.taxable)) W('Nil-rated, exempted and non-GST supplies are not told apart. All zero-rate sales are put under "nil rated". Move any exempted or non-GST amount in the return.');
   const T = (a, f) => sum(a, f), rowsOf = list => list.flatMap(x => x.rows);
   out.totals = {
@@ -158,12 +158,13 @@ function validate1(r, opt) {
   const taxCheck = (rows, ref) => rows.forEach(x => { rate(x.rate, ref); const exp = c2(x.taxable * x.rate / 100), got = c2((x.igst || 0) + (x.cgst || 0) + (x.sgst || 0)); if (Math.abs(exp - got) > 1.01) Wn('Tax on ' + ref + ' at ' + x.rate + '% is ' + got + ' but ' + exp + ' is expected from the taxable value. The portal recalculates and may reject a difference of more than Rs 1.', ref); if ((x.igst || 0) > 0 && ((x.cgst || 0) > 0 || (x.sgst || 0) > 0)) E(ref + ' has both IGST and CGST/SGST on the same rate.', ref); if (x.taxable < 0) E(ref + ' has a negative taxable value.', ref); });
   r.b2b.forEach(x => { chkNo(x.number, 'Invoice'); if (!gstinOk(x.gstin)) E('Recipient GSTIN ' + x.gstin + ' (invoice ' + x.number + ') is not valid.', x.number); if (!POS_RE.test(x.pos || '')) E('Invoice ' + x.number + ' has no valid place of supply.', x.number); taxCheck(x.rows, 'invoice ' + x.number); });
   r.b2cl.forEach(x => { chkNo(x.number, 'Invoice'); if (!POS_RE.test(x.pos || '')) E('Invoice ' + x.number + ' has no valid place of supply.', x.number); taxCheck(x.rows, 'invoice ' + x.number); });
-  r.b2cs.forEach(x => { if (!POS_RE.test(x.pos || '')) E('A consumer sale has no valid place of supply.'); rate(x.rate, 'consumer sales'); });
+  r.b2cs.forEach(x => { if (!POS_RE.test(x.pos || '')) E('A consumer sale has no valid place of supply.'); rate(x.rate, 'consumer sales'); if (x.taxable < 0 || x.igst < 0 || x.cgst < 0 || x.sgst < 0) Wn('Consumer sales for place of supply ' + x.pos + ' at ' + x.rate + '% come to a negative amount (returns of earlier sales). The portal may refuse a negative line: check it after upload.', x.pos); });
   r.cdnr.forEach(x => { chkNo(x.number, 'Note'); if (!gstinOk(x.gstin)) E('Recipient GSTIN ' + x.gstin + ' (note ' + x.number + ') is not valid.', x.number); });
   r.cdnur.forEach(x => { chkNo(x.number, 'Note'); Wn('Note ' + x.number + ' is a credit/debit note to a consumer above the large-invoice limit. Check the CDNUR table after uploading.', x.number); });
   r.exp.forEach(x => { chkNo(x.number, 'Invoice'); taxCheck(x.rows, 'export invoice ' + x.number); });
   const dg = opt.hsnDigits || r.hsnDigits || 4;
   for (const b of ['b2b', 'b2c']) r.hsn[b].forEach(x => { if (!/^\d+$/.test(x.hsn) || ![4, 6, 8].includes(x.hsn.length) && x.hsn.length < dg) E('HSN / SAC "' + x.hsn + '" must be at least ' + dg + ' digits.', x.hsn); else if (x.hsn.length < dg) E('HSN / SAC "' + x.hsn + '" must be at least ' + dg + ' digits.', x.hsn); if (/^99/.test(x.hsn) ? false : (!x.uqc || x.uqc === 'NA')) Wn('HSN ' + x.hsn + ' is goods but has no unit. Set the unit (nos, kg, ...) on the invoice line.', x.hsn); rate(x.rate, 'HSN ' + x.hsn); });
+  ((r.supeco && r.supeco.clttx) || []).forEach(x => { if (!gstinOk(x.etin)) E('Operator GSTIN ' + x.etin + ' (Table 14) is not valid.', x.etin); });
   r.docs.forEach(d => { if (!DOCNO_RE.test(d.from) || !DOCNO_RE.test(d.to)) E('Documents issued: "' + d.from + '" to "' + d.to + '" has a number the portal does not allow.', d.from); });
   return out;
 }
@@ -253,6 +254,7 @@ function gstr1Json(r, gstin) {
   if (r.cdnr.length) j.cdnr = [...by(r.cdnr, 'gstin')].map(([ctin, nt]) => ({ctin, nt: nt.map(x => ({ntty: x.ntty, nt_num: x.number, nt_dt: dmy(x.date), val: n2(x.value), pos: x.pos, rchrg: x.rchrg, inv_typ: x.invType, itms: [itm(1, x)]}))}));
   if (r.cdnur.length) j.cdnur = r.cdnur.map(x => ({typ: x.urType, ntty: x.ntty, nt_num: x.number, nt_dt: dmy(x.date), val: n2(x.value), pos: x.pos, itms: [itm(1, x)]}));
   if (r.exp.length) { const g = new Map(); r.exp.forEach(x => { if (!g.has(x.expType)) g.set(x.expType, []); g.get(x.expType).push(x); }); j.exp = [...g].map(([ex_tp, inv]) => ({exp_typ: ex_tp, inv: inv.map(x => ({inum: x.number, idt: dmy(x.date), val: n2(x.value), itms: x.rows.map(l => ({txval: n2(l.taxable), rt: l.rate, iamt: n2(l.igst || 0), csamt: 0}))}))})); }
+  if (r.supeco && r.supeco.clttx && r.supeco.clttx.length) j.supeco = {clttx: r.supeco.clttx.map(x => ({etin: x.etin, suppval: n2(x.suppval), igst: n2(x.igst), cgst: n2(x.cgst), sgst: n2(x.sgst), cess: 0}))};
   if (r.nil.some(x => x.taxable)) j.nil = {inv: NIL_TY.map(([t, i]) => ({sply_ty: t, expt_amt: 0, nil_amt: n2(r.nil[i].taxable), ngsup_amt: 0}))};
   const hs = list => list.map((x, i) => ({num: i + 1, hsn_sc: x.hsn, desc: String(x.desc || '').slice(0, 30), uqc: x.uqc, qty: /^99/.test(x.hsn) ? 0 : n2(x.qty), rt: x.rate, txval: n2(x.taxable), iamt: n2(x.igst), camt: n2(x.cgst), samt: n2(x.sgst), csamt: 0}));
   if (r.hsn.b2b.length || r.hsn.b2c.length) j.hsn = {hsn_b2b: hs(r.hsn.b2b), hsn_b2c: hs(r.hsn.b2c)};
@@ -319,6 +321,7 @@ function gstr1Sheets(r) {
   S['Exports-SEZ'] = [['Invoice number', 'Date', 'Customer', 'Type', 'Invoice value', 'Taxable value', 'IGST']].concat(r.exp.map(x => [x.number, dmy(x.date), x.customer, x.type, x.value, x.taxable, x.igst]));
   const hs = (list) => [['HSN / SAC', 'Description', 'UQC', 'Quantity', 'Rate %', 'Total value', 'Taxable value', 'IGST', 'CGST', 'SGST']].concat(list.map(x => [x.hsn, x.desc, x.uqc, x.qty, x.rate, x.val, x.taxable, x.igst, x.cgst, x.sgst]));
   S['HSN-B2B'] = hs(r.hsn.b2b); S['HSN-B2C'] = hs(r.hsn.b2c);
+  if (r.supeco && r.supeco.clttx && r.supeco.clttx.length) S['Table14-ECO'] = [['Operator GSTIN', 'Operator', 'Net taxable value', 'IGST', 'CGST', 'SGST']].concat(r.supeco.clttx.map(x => [x.etin, x.name || '', x.suppval, x.igst, x.cgst, x.sgst]));
   S['Documents'] = [['Document type', 'From', 'To', 'Total issued', 'Cancelled', 'Net issued', 'Numbers missing']].concat(r.docs.map(x => [x.label, x.from, x.to, x.total, x.cancelled, x.net, x.gaps]));
   return S;
 }

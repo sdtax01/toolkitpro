@@ -119,10 +119,11 @@ const BUILTIN_DATE = new Set([14, 15, 16, 17, 18, 19, 20, 21, 22, 27, 28, 29, 30
 const isDateCode = c => { c = String(c).replace(/"[^"]*"/g, '').replace(/\[[^\]]*\]/g, '').replace(/\\./g, ''); return /[dmyhs]/i.test(c) && !/^general$/i.test(c.trim()); };
 const serialToISO = n => { const d = new Date(Math.round((Math.floor(n) - 25569) * 864e5)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); };
 const colIdx = ref => { const m = /^([A-Z]+)/.exec(ref); let n = 0; for (const ch of m[1]) n = n * 26 + ch.charCodeAt(0) - 64; return n - 1; };
-async function readXlsx(buf) {
+/* sheet: optional sheet name (default: the first sheet). */
+async function readXlsx(buf, sheet) {
   const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf), idx = zipIndex(u8);
   const wb = await zipRead(u8, idx, 'xl/workbook.xml'); if (!wb) throw new Error('This file does not look like an Excel workbook.');
-  let sheetPath = null; const sm = /<sheet\b[^>]*>/.exec(wb);
+  let sheetPath = null; const tags = wb.match(/<sheet\b[^>]*>/g) || [], pick = (sheet != null && tags.find(t => (attr(t, 'name') || '') === sheet)) || tags[0], sm = pick ? [pick] : null;
   if (sm) { const rid = attr(sm[0], 'r:id'), rels = await zipRead(u8, idx, 'xl/_rels/workbook.xml.rels'); if (rid && rels) { const r = new RegExp('<Relationship\\b[^>]*\\bId="' + rid + '"[^>]*>').exec(rels); const t = r && attr(r[0], 'Target'); if (t) sheetPath = t.startsWith('/') ? t.slice(1) : 'xl/' + t; } }
   if (!sheetPath || !idx.out.has(sheetPath)) sheetPath = [...idx.out.keys()].filter(k => /^xl\/worksheets\/sheet\d+\.xml$/.test(k)).sort()[0];
   if (!sheetPath) throw new Error('No worksheet found in this workbook.');
@@ -151,6 +152,12 @@ async function readXlsx(buf) {
   const out = [];
   [...rows.keys()].sort((a, b) => a - b).forEach(rn => { const c = rows.get(rn), full = Array.from({length: c.length}, (_, i) => c[i] == null ? '' : String(c[i])); if (full.some(x => x.trim() !== '')) out.push({n: rn, cells: full}); });
   return out;
+}
+
+/* Names of the sheets in a workbook, in order. */
+async function xlsxSheets(buf) {
+  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf), idx = zipIndex(u8), wb = await zipRead(u8, idx, 'xl/workbook.xml');
+  return wb ? (wb.match(/<sheet\b[^>]*>/g) || []).map(t => (attr(t, 'name') || '')) : [];
 }
 
 /* ================================================================== value parsers ==== */
@@ -689,7 +696,7 @@ function exportBank(d) {
   return rows;
 }
 
-const api = {clean, norm, normName, similarity, suggest, lev, decodeText, sniffDelimiter, parseCSV, toCSV, safeCell, unsafeCell, readXlsx, serialToISO,
+const api = {clean, norm, normName, similarity, suggest, lev, decodeText, sniffDelimiter, parseCSV, toCSV, safeCell, unsafeCell, readXlsx, xlsxSheets, serialToISO,
   parseDate, parseAmount, parseRate, parseBool, FIELDS, TITLES, detectHeader, autoMap, records, templateCSV, SAMPLE, resolveParty, resolveHead, bankMatch,
   buildDocs, buildBank, createMasters, mastersToCreate, toPostDocs, toPostTxns, postable, postSales, postPurchases, postBank, exportSales, exportPurchases, exportBank, addDays, ST};
 if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.IM = api;
