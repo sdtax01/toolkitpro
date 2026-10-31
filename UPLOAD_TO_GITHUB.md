@@ -113,3 +113,9 @@ HSN/SAC and invoice line items, reverse charge, e-invoice/e-way bill, TDS/TCS ra
 2. Changed files: `assets/app.js`, `assets/app.css`, `settings.html`, `invoice-new.html`, `notes.html`, `banking.html`, `transactions.html`, and the version number in every page.
 3. Run migration 022 in the Supabase SQL editor (staging first).
 4. Hard-refresh the browser (version 20261031).
+
+## This update (practice suite)
+1. Upload everything, including the new files: `clients.html`, `compliance.html`, `recurring.html`, `gst-returns.html`, `assets/practice-core.js`, `assets/practice-ui.js`, `assets/gst-returns.js`, `assets/returns-ui.js`, `supabase/migrations/023_practice_suite.sql`, `supabase/undo/023_practice_suite_down.sql`, and the new files in `tests/`.
+2. Changed files: `assets/app.js` (three menu entries and the version number) and the version number in every page.
+3. Run migration 023 in the Supabase SQL editor (staging first). "Success. No rows returned" is the normal result.
+4. Hard-refresh the browser (version 20261101).

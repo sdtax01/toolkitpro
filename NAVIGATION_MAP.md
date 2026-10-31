@@ -82,3 +82,5 @@ Items with a `#section` jump to a card on an existing page. They are views of th
 - Accounting > Import / Export (`import-export.html`)
 - Settings > Document Numbering (`settings.html#series`)
 - Settings > Data Reset (`settings.html#reset`)
+- Sales > Client Master (`clients.html`), Sales > Recurring Invoices (`recurring.html`)
+- Tax & Compliance > GST Returns (GSTR-1 / 3B / 2B) (`gst-returns.html`), Tax & Compliance > Compliance Tracker (`compliance.html`)
