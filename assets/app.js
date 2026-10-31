@@ -14,10 +14,10 @@ const RATES=[0,3,5,12,18,28,40];
    Items with a #hash jump to a section of an existing page; they are not separate copies of the data. */
 const NAV=[
  {t:'Dashboard',h:'index.html',i:'home'},
- {g:'sales',t:'Sales',i:'sales',c:[['Customers','customers.html?kind=client'],['Sales Invoices','invoices.html?kind=sale'],['Credit Notes','notes.html?kind=credit'],['Debtors Ageing','ageing.html?kind=sale'],['Customer Statements','statement.html?kind=client']]},
+ {g:'sales',t:'Sales',i:'sales',c:[['Customers','customers.html?kind=client'],['Client Master','clients.html'],['Sales Invoices','invoices.html?kind=sale'],['Recurring Invoices','recurring.html'],['Credit Notes','notes.html?kind=credit'],['Debtors Ageing','ageing.html?kind=sale'],['Customer Statements','statement.html?kind=client']]},
  {g:'purchases',t:'Purchases',i:'purchases',c:[['Suppliers','customers.html?kind=supplier'],['Purchase Bills','invoices.html?kind=purchase'],['Debit Notes','notes.html?kind=debit'],['Creditors Ageing','ageing.html?kind=purchase'],['Supplier Statements','statement.html?kind=supplier']]},
  {g:'accounting',t:'Accounting',i:'accounting',c:[['Transactions','transactions.html'],['Banking','banking.html'],['Import / Export','import-export.html'],['Bank Reconciliation','bank-rec.html'],['Closing Stock','stock.html'],['Fixed Assets','fixed-assets.html'],['Other Assets','assets.html'],['Budgets','budgets.html'],['Financial Goals','goals.html']]},
- {g:'tax',t:'Tax & Compliance',i:'tax',c:[['GST & Taxes','taxes.html'],['Credit / Debit Notes','notes.html'],['TDS Entries','tds.html'],['Documents & Uploads','documents.html'],['Compliance Calendar','calendar.html'],['Reminders','reminders.html']]},
+ {g:'tax',t:'Tax & Compliance',i:'tax',c:[['GST & Taxes','taxes.html'],['GST Returns (GSTR-1 / 3B / 2B)','gst-returns.html'],['Compliance Tracker','compliance.html'],['Credit / Debit Notes','notes.html'],['TDS Entries','tds.html'],['Documents & Uploads','documents.html'],['Compliance Calendar','calendar.html'],['Reminders','reminders.html']]},
  {g:'reports',t:'Reports & Insights',i:'reports',c:[['Reports Dashboard','reports.html'],['Monthly / Financial Year Analysis','reports.html#monthly'],['Business Overview','overview.html'],['Daily Summary','daily.html']]},
  {g:'books',t:'Books of Accounts',i:'books',c:[['Trial Balance','trial-balance.html'],['General Ledger','ledger.html'],['Cash Book','ledger.html?book=cash'],['Day Book','daybook.html'],['Journal Entry (Manual Posting)','journal-new.html'],['Profit & Loss','profit-loss.html'],['Balance Sheet','balance-sheet.html'],['Financial Statements (Schedule III)','statements.html',[['Balance Sheet','statements.html#sch-bs'],['Statement of Profit and Loss','statements.html#sch-pl'],['Cash Flow Statement','statements.html#sch-cf']]],['Year-end Review','year-end.html'],['Chart of Accounts','coa.html'],['Ledger Setup','ledger-setup.html']]},
  {g:'settings',t:'Settings',i:'settings',c:[['Company Profile','settings.html#company'],['Business & GST Details','settings.html#gst'],['Document Numbering','settings.html#series'],['Application Settings','settings.html#app'],['Voice Assistant','settings.html#voice'],['Data Reset','settings.html#reset']]}
@@ -157,7 +157,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261031" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261101" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -210,11 +210,11 @@ function login(){
  form.addEventListener('input',()=>{if(msg.classList.contains('er'))say('')});
  $('#e').focus()}
 /* Voice assistant: loaded on every signed-in page (microphone button at the bottom right). Safe to call twice. */
-let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261031').then(()=>add('assets/voice.js?v=20261031')).then(res)}));
+let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261101').then(()=>add('assets/voice.js?v=20261101')).then(res)}));
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const file=location.pathname.split('/').pop()||'index.html',Qo=Object.fromEntries(Q),fb=act||file+location.search,nowOn=()=>navFind(file,Qo,location.hash,fb),on=nowOn();
- document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261031" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261101" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  const setNav=o=>{document.body.classList.toggle('navopen',o);$('#mn').setAttribute('aria-expanded',o)};
  $('#mn').onclick=()=>setNav(!document.body.classList.contains('navopen'));
  $('#scrim').onclick=()=>setNav(false);

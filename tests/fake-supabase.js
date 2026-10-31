@@ -19,6 +19,8 @@ function run(st){
   for(const r of list){const bad=miss(st.t,r);if(bad)return{data:null,error:{code:'PGRST204',message:"Could not find the '"+bad+"' column of '"+st.t+"' in the schema cache"}};
    if(st.t==='invoices'&&T.some(x=>x.kind===r.kind&&String(x.number).trim().toLowerCase()===String(r.number).trim().toLowerCase()))return{data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "invoices_user_kind_number_uq"'}};
    if(st.t==='transactions'&&r.voucher_no&&T.some(x=>x.voucher_no&&x.voucher_no.toLowerCase()===r.voucher_no.toLowerCase()))return{data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "transactions_voucher_uq"'}};
+   if(st.t==='client_master'&&T.some(x=>x.party_id===r.party_id))return{data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "client_master_party_uq"'}};
+   if(st.t==='compliance_tasks'&&T.some(x=>(x.party_id||null)===(r.party_id||null)&&x.service===r.service&&x.period===r.period))return{data:null,error:{code:'23505',message:'duplicate key value violates unique constraint "compliance_tasks_uq"'}};
    const row={id:'n'+(++seq),paid:0,adjusted:0,...r};T.push(row);made.push(row)}
   window.__LOG.push({t:st.t,op:'insert',rows:made.length});
   return st.single||!Array.isArray(st.row)?{data:made[0],error:null}:{data:made,error:null}}

@@ -41,7 +41,7 @@ function speak(text) {
 let DATA = null, EXTRA = null;
 async function fresh() { const d = await load0(); DATA = d; return d; }
 async function ensureStatement() {
-  if (typeof TP === 'undefined') await new Promise(r => { const s = document.createElement('script'); s.src = 'assets/reports-lib.js?v=20261031'; s.onload = s.onerror = r; document.head.appendChild(s); });
+  if (typeof TP === 'undefined') await new Promise(r => { const s = document.createElement('script'); s.src = 'assets/reports-lib.js?v=20261101'; s.onload = s.onerror = r; document.head.appendChild(s); });
   if (!EXTRA) {
     const [nq, dq] = await Promise.all([db.from('gst_notes').select('*'), db.from('tds_entries').select('*')]);
     EXTRA = [...(nq.error ? [] : nq.data || []).map(n => ({invoice_id: n.invoice_id, date: n.date, amount: n.amount, label: n.kind === 'credit' ? 'Credit note' : 'Debit note', ref: n.number})),
@@ -237,8 +237,8 @@ async function doPost2(a) {
 /* "Share ledger statement": builds the A4 statement PDF (assets/pdf.js), saves it, and offers Share PDF (device share sheet, needs a tap) and an Open WhatsApp chat with the message. */
 async function ensurePdf() {
   const add = src => new Promise(r => { const e = document.createElement('script'); e.src = src; e.onload = e.onerror = r; document.head.appendChild(e); });
-  if (!window.GF) await add('assets/gst-fields.js?v=20261031');
-  if (!window.TPPdf) await add('assets/pdf.js?v=20261031');
+  if (!window.GF) await add('assets/gst-fields.js?v=20261101');
+  if (!window.TPPdf) await add('assets/pdf.js?v=20261101');
   if (!window.GF || !window.TPPdf) throw new Error('PDF files are missing on the site (assets/gst-fields.js, assets/pdf.js)');
 }
 async function doWhatsApp(a) {
