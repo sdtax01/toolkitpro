@@ -157,7 +157,7 @@ function login(){
  <div class="amb" aria-hidden="true"><i class="mesh m1"></i><i class="mesh m2"></i><i class="mesh m3"></i><i class="dr d1"></i><i class="dr d2"></i><i class="dr d3"></i><i class="dr d4"></i><i class="dr d5"></i><i class="dr d6"></i><i class="blob bl"></i><i class="blob br"></i></div>
  <main class="authwrap">
   <form class="card login glass" novalidate aria-labelledby="lt">
-   <img class="alogo" src="assets/logo-login.png?v=20261101" alt="Shree Digitax Solutions" width="420" height="261">
+   <img class="alogo" src="assets/logo-login.png?v=20261102" alt="Shree Digitax Solutions" width="420" height="261">
    <h1 id="lt">Login</h1>
    <p class="sub">Welcome Back! Please login to continue.</p>
    <div class="fld"><label for="e" class="sr">Email ID</label><span class="ico">${ic.user}</span><input id="e" name="email" type="email" placeholder="Email ID" autocomplete="username" required></div>
@@ -210,11 +210,11 @@ function login(){
  form.addEventListener('input',()=>{if(msg.classList.contains('er'))say('')});
  $('#e').focus()}
 /* Voice assistant: loaded on every signed-in page (microphone button at the bottom right). Safe to call twice. */
-let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261101').then(()=>add('assets/voice.js?v=20261101')).then(res)}));
+let VOICE_P=null;const loadVoice=()=>VOICE_P||(VOICE_P=new Promise(res=>{const add=src=>new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=s.onerror=r;document.head.appendChild(s)});add('assets/voice-core.js?v=20261102').then(()=>add('assets/voice.js?v=20261102')).then(res)}));
 async function boot(title,render,act){
  const{data:{session}}=await db.auth.getSession();if(!session)return login();
  const file=location.pathname.split('/').pop()||'index.html',Qo=Object.fromEntries(Q),fb=act||file+location.search,nowOn=()=>navFind(file,Qo,location.hash,fb),on=nowOn();
- document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261101" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
+ document.body.innerHTML=`<a class=skip href="#main">Skip to main content</a><aside id=sidenav aria-label="Sidebar"><div class=brand><img src="assets/logo.png?v=20261102" alt="Shree Digitax Solutions"></div><nav aria-label="Main">${navHTML(on)}</nav></aside><div class=scrim id=scrim></div><section><header><div class=hl><button class="g menu" id=mn aria-label="Toggle navigation" aria-expanded="false" aria-controls="sidenav">☰</button><div><h1>${title}</h1><small id=who>Welcome back!</small></div></div><div class=noprint><button class=g id=out>Sign out</button></div></header><main id=main aria-busy=true>${SKEL}</main></section>`;
  const setNav=o=>{document.body.classList.toggle('navopen',o);$('#mn').setAttribute('aria-expanded',o)};
  $('#mn').onclick=()=>setNav(!document.body.classList.contains('navopen'));
  $('#scrim').onclick=()=>setNav(false);
